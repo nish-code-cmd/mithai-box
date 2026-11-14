@@ -1,54 +1,46 @@
+/**
+ * Categories API
+ * GET /api/categories — all active categories
+ * GET /api/categories?slug=xyz — single category with products
+ */
 import { NextRequest, NextResponse } from 'next/server';
-import { nanoid } from 'nanoid';
-import { connectDB } from '@/lib/db/connect';
-import { Category, Product } from '@/models';
+import { createClient } from '@/lib/supabase/server';
 
-// ============================================================
-// GET /api/categories — List all active categories with product counts
-// ============================================================
-export async function GET(_request: NextRequest) {
-  const requestId = nanoid(10);
-
+export async function GET(request: NextRequest) {
   try {
-    await connectDB();
+    const { searchParams } = new URL(request.url);
+    const slug = searchParams.get('slug');
 
-    const categories = await Category.find({ isActive: true })
-      .sort({ sortOrder: 1, name: 1 })
-      .lean();
+    const supabase = await createClient();
 
-    // Get product counts per category in one aggregation
-    const productCounts = await Product.aggregate([
-      { $match: { isActive: true } },
-      { $group: { _id: '$category', count: { $sum: 1 } } },
-    ]);
+    if (slug) {
+      const { data, error } = await supabase
+        .from('categories')
+        .select('*')
+        .eq('slug', slug)
+        .eq('is_active', true)
+        .single();
 
-    const countMap = new Map<string, number>(
-      productCounts.map((pc) => [pc._id.toString(), pc.count])
-    );
+      if (error || !data) {
+        return NextResponse.json({ error: 'Category not found' }, { status: 404 });
+      }
 
-    return NextResponse.json(
-      {
-        success: true,
-        data: categories.map((cat) => ({
-          id: cat._id.toString(),
-          name: cat.name,
-          slug: cat.slug,
-          description: cat.description ?? null,
-          imageUrl: cat.imageUrl ?? null,
-          parent: cat.parent?.toString() ?? null,
-          sortOrder: cat.sortOrder,
-          seoTitle: cat.seoTitle ?? null,
-          seoDescription: cat.seoDescription ?? null,
-          productCount: countMap.get(cat._id.toString()) ?? 0,
-        })),
-      },
-      { status: 200 }
-    );
+      return NextResponse.json({ category: data });
+    }
+
+    const { data, error } = await supabase
+      .from('categories')
+      .select('*')
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true });
+
+    if (error) {
+      return NextResponse.json({ error: 'Failed to fetch categories' }, { status: 500 });
+    }
+
+    return NextResponse.json({ categories: data || [] });
   } catch (err) {
-    console.error('[GET /api/categories] Unexpected error:', err);
-    return NextResponse.json(
-      { success: false, error: 'internal_error', message: 'An unexpected error occurred.', requestId },
-      { status: 500 }
-    );
+    console.error('[Categories GET] Error:', err);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

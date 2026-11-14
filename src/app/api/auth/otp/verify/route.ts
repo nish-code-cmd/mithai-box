@@ -1,89 +1,82 @@
+/**
+ * Auth API — Verify OTP
+ * POST /api/auth/otp/verify
+ * Verifies the 6-digit OTP with Supabase Auth
+ */
 import { NextRequest, NextResponse } from 'next/server';
-import { nanoid } from 'nanoid';
-import { connectDB } from '@/lib/db/connect';
-import { verifyOTP } from '@/lib/auth/otp';
-import { createCustomerSession, setCustomerSessionCookie } from '@/lib/auth/session';
-import { VerifyOTPSchema } from '@/lib/validation/schemas';
-import { User } from '@/models';
-import { consumePersistentRateLimit } from '@/lib/security/rate-limit';
-import { getClientIp, isTrustedMutation } from '@/lib/security/request';
+import { createClient } from '@/lib/supabase/server';
 
 export async function POST(request: NextRequest) {
-  const requestId = nanoid(10);
-
-  if (!isTrustedMutation(request)) {
-    return NextResponse.json({ success: false, error: 'Invalid request origin', requestId }, { status: 403 });
-  }
-
   try {
-    const body = await request.json().catch(() => null);
-    const parsed = VerifyOTPSchema.safeParse(body);
-    if (!parsed.success) {
+    const body = await request.json();
+    const { email, token } = body;
+
+    if (!email || !token) {
       return NextResponse.json(
-        { success: false, error: 'Validation failed', details: parsed.error.flatten().fieldErrors, requestId },
-        { status: 422 }
+        { error: 'Email and OTP token are required' },
+        { status: 400 }
       );
     }
 
-    const { email, otp, name, phone, company } = parsed.data;
-    const rateLimit = await consumePersistentRateLimit({
-      namespace: 'otp-verify',
-      identifier: `${email.toLowerCase()}:${getClientIp(request)}`,
-      limit: parseInt(process.env.OTP_VERIFY_RATE_LIMIT_MAX ?? '10'),
-      windowMs: parseInt(process.env.OTP_RATE_LIMIT_WINDOW_MS ?? '900000'),
-    });
-
-    if (!rateLimit.allowed) {
+    if (typeof token !== 'string' || token.length !== 6) {
       return NextResponse.json(
-        { success: false, error: 'Too many verification attempts. Please request a new code.', requestId },
-        { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfterSeconds) } }
+        { error: 'OTP must be 6 digits' },
+        { status: 400 }
       );
     }
 
-    await connectDB();
-    const result = await verifyOTP(email, otp, { name, phone, company });
-    if (!result.success) {
-      const statusMap: Record<string, number> = {
-        not_found: 404,
-        expired: 410,
-        invalid: 400,
-        max_attempts: 429,
-        already_used: 409,
-      };
-      const messageMap: Record<string, string> = {
-        not_found: 'No OTP request found for this email. Please request a new code.',
-        expired: 'This OTP has expired. Please request a new code.',
-        invalid: 'Invalid OTP. Please check and try again.',
-        max_attempts: 'Maximum attempts reached. Please request a new code.',
-        already_used: 'This OTP has already been used. Please request a new code.',
-      };
-      const error = result.error ?? 'invalid';
+    const supabase = await createClient();
+
+    const { data, error } = await supabase.auth.verifyOtp({
+      email: email.toLowerCase().trim(),
+      token: token.trim(),
+      type: 'email',
+    });
+
+    if (error) {
+      console.error('[OTP Verify Error]', error.message);
       return NextResponse.json(
-        { success: false, error, message: messageMap[error], requestId },
-        { status: statusMap[error] ?? 400 }
+        { error: 'Invalid or expired OTP. Please try again.' },
+        { status: 400 }
       );
     }
 
-    const sessionId = await createCustomerSession(result.userId!, {
-      ipAddress: getClientIp(request),
-      userAgent: request.headers.get('user-agent') ?? undefined,
-    });
-    await setCustomerSessionCookie(sessionId);
+    if (!data.user) {
+      return NextResponse.json(
+        { error: 'Verification failed' },
+        { status: 400 }
+      );
+    }
 
-    const user = await User.findById(result.userId).select('_id email name').lean();
-    return NextResponse.json({
-      success: true,
-      isNewUser: result.isNewUser,
-      user: {
-        id: user?._id?.toString() ?? result.userId,
-        email: user?.email ?? email,
-        name: user?.name ?? null,
-      },
-    });
-  } catch (error) {
-    console.error('[POST /api/auth/otp/verify] Unexpected error:', error);
+    // Ensure profile exists (created by DB trigger, but let's be safe)
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .upsert(
+        {
+          id: data.user.id,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'id', ignoreDuplicates: true }
+      );
+
+    if (profileError) {
+      console.warn('[OTP Verify] Profile upsert error:', profileError.message);
+    }
+
     return NextResponse.json(
-      { success: false, error: 'internal_error', message: 'An unexpected error occurred.', requestId },
+      {
+        success: true,
+        user: {
+          id: data.user.id,
+          email: data.user.email,
+        },
+      },
+      { status: 200 }
+    );
+  } catch (err) {
+    console.error('[OTP Verify] Unexpected error:', err);
+    return NextResponse.json(
+      { error: 'Something went wrong. Please try again.' },
       { status: 500 }
     );
   }

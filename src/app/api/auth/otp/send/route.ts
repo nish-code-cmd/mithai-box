@@ -1,88 +1,58 @@
+/**
+ * Auth API — Send OTP
+ * POST /api/auth/otp/send
+ * Uses Supabase Auth signInWithOtp (magic link / OTP to email)
+ */
 import { NextRequest, NextResponse } from 'next/server';
-import { connectDB } from '@/lib/db/connect';
-import { generateAndStoreOTP, checkOTPRateLimit } from '@/lib/auth/otp';
-import { sendOTPEmail } from '@/lib/email';
-import { SendOTPSchema } from '@/lib/validation/schemas';
-import { nanoid } from 'nanoid';
-import { consumePersistentRateLimit } from '@/lib/security/rate-limit';
-import { getClientIp, isTrustedMutation } from '@/lib/security/request';
+import { createClient } from '@/lib/supabase/server';
 
 export async function POST(request: NextRequest) {
-  const requestId = nanoid(10);
-
-  if (!isTrustedMutation(request)) {
-    return NextResponse.json({ success: false, error: 'Invalid request origin', requestId }, { status: 403 });
-  }
-
   try {
-    const body = await request.json().catch(() => null);
-    const parsed = SendOTPSchema.safeParse(body);
+    const body = await request.json();
+    const { email } = body;
 
-    if (!parsed.success) {
+    if (!email || typeof email !== 'string') {
       return NextResponse.json(
-        { success: false, error: 'Invalid email address', requestId },
+        { error: 'Email is required' },
         { status: 400 }
       );
     }
 
-    const { email } = parsed.data;
-    const ipAddress = getClientIp(request);
-    const windowMs = parseInt(process.env.OTP_RATE_LIMIT_WINDOW_MS ?? '900000');
-    const limit = parseInt(process.env.OTP_RATE_LIMIT_MAX ?? '3');
-    const rateLimit = await consumePersistentRateLimit({
-      namespace: 'otp-send',
-      identifier: `${email.toLowerCase()}:${ipAddress}`,
-      limit,
-      windowMs,
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return NextResponse.json(
+        { error: 'Invalid email address' },
+        { status: 400 }
+      );
+    }
+
+    const supabase = await createClient();
+
+    const { error } = await supabase.auth.signInWithOtp({
+      email: email.toLowerCase().trim(),
+      options: {
+        shouldCreateUser: true,
+        emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`,
+      },
     });
 
-    if (!rateLimit.allowed) {
+    if (error) {
+      console.error('[OTP Send Error]', error.message);
+      // Don't expose internal errors — show generic message
       return NextResponse.json(
-        {
-          success: false,
-          error: `Too many requests. Please try again in ${Math.ceil(rateLimit.retryAfterSeconds / 60)} minutes.`,
-          retryAfterSeconds: rateLimit.retryAfterSeconds,
-          requestId,
-        },
-        { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfterSeconds) } }
+        { error: 'Failed to send OTP. Please try again.' },
+        { status: 500 }
       );
-    }
-
-    const emailRateLimit = await checkOTPRateLimit(email);
-    if (!emailRateLimit.allowed) {
-      const retryAfterSeconds = Math.ceil((emailRateLimit.retryAfterMs ?? windowMs) / 1000);
-      return NextResponse.json(
-        {
-          success: false,
-          error: `Too many requests. Please try again in ${Math.ceil(retryAfterSeconds / 60)} minutes.`,
-          retryAfterSeconds,
-          requestId,
-        },
-        { status: 429, headers: { 'Retry-After': String(retryAfterSeconds) } }
-      );
-    }
-
-    await connectDB();
-    const { otp, expiresAt } = await generateAndStoreOTP(email);
-    await sendOTPEmail(email, otp);
-
-    if (process.env.NODE_ENV === 'development' && process.env.MOCK_EMAIL === 'true') {
-      console.log(`[DEV] OTP for ${email}: ${otp}`);
     }
 
     return NextResponse.json(
-      {
-        success: true,
-        message: 'Login code sent. Please check your email.',
-        expiresAt: expiresAt.toISOString(),
-        requestId,
-      },
+      { success: true, message: 'OTP sent to your email' },
       { status: 200 }
     );
-  } catch (error) {
-    console.error('[API /auth/otp/send]', error);
+  } catch (err) {
+    console.error('[OTP Send] Unexpected error:', err);
     return NextResponse.json(
-      { success: false, error: 'Failed to send login code. Please try again.', requestId },
+      { error: 'Something went wrong. Please try again.' },
       { status: 500 }
     );
   }

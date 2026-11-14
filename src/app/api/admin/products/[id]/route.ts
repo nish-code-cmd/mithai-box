@@ -1,123 +1,94 @@
+/**
+ * Admin Product by ID
+ * GET /api/admin/products/[id]
+ * PATCH /api/admin/products/[id]
+ * DELETE /api/admin/products/[id]
+ */
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAdminAuth } from '@/lib/auth/session';
-import { connectDB } from '@/lib/db/connect';
-import { Product, Inventory, AuditLog } from '@/models';
-import { CreateProductSchema } from '@/lib/validation/schemas';
+import { createClient } from '@/lib/supabase/server';
+import { getAdminClient } from '@/lib/supabase/admin';
 
-type Params = { params: Promise<{ id: string }> };
+async function requireAdmin(supabase: Awaited<ReturnType<typeof createClient>>) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+  if (!profile || !['admin', 'superadmin'].includes(profile.role)) return null;
+  return user;
+}
 
-export async function GET(_req: NextRequest, { params }: Params) {
+export async function GET(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
-    await requireAdminAuth();
-  } catch {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+    const { id } = await params;
+    const supabase = await createClient();
+    const user = await requireAdmin(supabase);
+    if (!user) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
-  const { id } = await params;
+    const admin = getAdminClient();
+    const { data, error } = await admin
+      .from('products')
+      .select('*, categories(id, name, slug)')
+      .eq('id', id)
+      .single();
 
-  try {
-    await connectDB();
-
-    const [product, inventory] = await Promise.all([
-      Product.findById(id).populate('category', 'name slug').lean(),
-      Inventory.findOne({ product: id }).lean(),
-    ]);
-
-    if (!product) {
-      return NextResponse.json({ error: 'Product not found' }, { status: 404 });
-    }
-
-    return NextResponse.json({ product, inventory });
+    if (error || !data) return NextResponse.json({ error: 'Product not found' }, { status: 404 });
+    return NextResponse.json({ product: data });
   } catch (err) {
-    console.error('[Admin Product GET] Error:', err);
+    console.error('[Admin Product GET]', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
-export async function PUT(req: NextRequest, { params }: Params) {
-  let session: Awaited<ReturnType<typeof requireAdminAuth>>;
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
-    session = await requireAdminAuth(['super_admin', 'catalog_manager']);
+    const { id } = await params;
+    const supabase = await createClient();
+    const user = await requireAdmin(supabase);
+    if (!user) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+
+    const body = await request.json();
+    const admin = getAdminClient();
+
+    const { data, error } = await admin
+      .from('products')
+      .update({ ...body, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ product: data });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : 'Unauthorized';
-    return NextResponse.json({ error: msg }, { status: msg === 'FORBIDDEN' ? 403 : 401 });
-  }
-
-  const { id } = await params;
-
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
-  }
-
-  const parsed = CreateProductSchema.partial().safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json({ error: 'Validation failed', issues: parsed.error.issues }, { status: 400 });
-  }
-
-  try {
-    await connectDB();
-
-    const product = await Product.findByIdAndUpdate(id, parsed.data, { new: true, runValidators: true }).lean();
-
-    if (!product) {
-      return NextResponse.json({ error: 'Product not found' }, { status: 404 });
-    }
-
-    await AuditLog.create({
-      adminId: String(session.admin._id),
-      adminEmail: session.admin.email,
-      action: 'product.update',
-      resourceType: 'Product',
-      resourceId: id,
-      changes: parsed.data,
-    });
-
-    return NextResponse.json({ product });
-  } catch (err) {
-    console.error('[Admin Product PUT] Error:', err);
+    console.error('[Admin Product PATCH]', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
-export async function DELETE(_req: NextRequest, { params }: Params) {
-  let session: Awaited<ReturnType<typeof requireAdminAuth>>;
+export async function DELETE(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
-    session = await requireAdminAuth(['super_admin', 'catalog_manager']);
+    const { id } = await params;
+    const supabase = await createClient();
+    const user = await requireAdmin(supabase);
+    if (!user) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+
+    const admin = getAdminClient();
+    const { error } = await admin
+      .from('products')
+      .update({ is_active: false, updated_at: new Date().toISOString() })
+      .eq('id', id);
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ success: true });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : 'Unauthorized';
-    return NextResponse.json({ error: msg }, { status: msg === 'FORBIDDEN' ? 403 : 401 });
-  }
-
-  const { id } = await params;
-
-  try {
-    await connectDB();
-
-    const product = await Product.findByIdAndUpdate(
-      id,
-      { isActive: false },
-      { new: true }
-    ).lean();
-
-    if (!product) {
-      return NextResponse.json({ error: 'Product not found' }, { status: 404 });
-    }
-
-    await AuditLog.create({
-      adminId: String(session.admin._id),
-      adminEmail: session.admin.email,
-      action: 'product.archive',
-      resourceType: 'Product',
-      resourceId: id,
-      changes: { isActive: false },
-    });
-
-    return NextResponse.json({ success: true, message: 'Product archived' });
-  } catch (err) {
-    console.error('[Admin Product DELETE] Error:', err);
+    console.error('[Admin Product DELETE]', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
