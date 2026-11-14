@@ -1,21 +1,7 @@
 version: 2
 updates:
-  # Keep npm dependencies up to date (weekly, grouped)
   - package-ecosystem: npm
     directory: /
     schedule:
-      interval: weekly
-      day: monday
-    open-pull-requests-limit: 3
-    groups:
-      production-dependencies:
-        dependency-type: production
-      dev-dependencies:
-        dependency-type: development
-
-  # Keep GitHub Actions up to date (monthly — less noise)
-  - package-ecosystem: github-actions
-    directory: /
-    schedule:
       interval: monthly
-    open-pull-requests-limit: 3
+    open-pull-requests-limit: 2

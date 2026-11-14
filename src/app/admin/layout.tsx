@@ -3,113 +3,152 @@ import Link from 'next/link';
 import { getAdminSession } from '@/lib/auth/session';
 import {
   LayoutDashboard, Package, ShoppingCart, Warehouse,
-  Users, Tag, MessageSquare, Settings, LogOut, ShieldAlert
+  Users, Tag, MessageSquare, Settings, LogOut,
+  ShieldAlert, Image, BarChart3, ChevronRight,
 } from 'lucide-react';
 import { BUSINESS } from '@/lib/constants';
 
 export const dynamic = 'force-dynamic';
 
-export default async function AdminLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+const NAV = [
+  { label: 'Overview',       href: '/admin',              icon: LayoutDashboard },
+  { label: 'Products',       href: '/admin/products',     icon: Package },
+  { label: 'Orders',         href: '/admin/orders',       icon: ShoppingCart },
+  { label: 'Inventory',      href: '/admin/inventory',    icon: Warehouse },
+  { label: 'Customers',      href: '/admin/customers',    icon: Users },
+  { label: 'Coupons',        href: '/admin/coupons',      icon: Tag },
+  { label: 'Enquiries',      href: '/admin/enquiries',    icon: MessageSquare },
+  { label: 'Settings',       href: '/admin/settings',     icon: Settings },
+];
+
+export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const session = await getAdminSession();
 
-  // If on login page, render children without sidebar
   return (
-    <div className="min-h-screen bg-[#F4F1EA] text-[#24211F] flex">
+    <div style={{
+      minHeight: '100vh', display: 'flex',
+      background: '#F4F1EA', color: '#24211F',
+      fontFamily: 'Inter, -apple-system, sans-serif',
+    }}>
+      {/* ─── SIDEBAR ─────────────────────────────────────── */}
       {session && (
-        <aside className="w-64 bg-[#24211F] text-[#FAF7F0] flex-shrink-0 flex flex-col justify-between hidden md:flex">
-          <div>
-            {/* Logo */}
-            <div className="p-6 border-b border-stone-800 flex items-center gap-3">
-              <div className="w-9 h-9 rounded-lg bg-[#681C2D] text-[#B8955A] flex items-center justify-center font-bold text-sm">
-                MB
+        <aside style={{
+          width: 240, flexShrink: 0,
+          background: '#1A100D',
+          display: 'flex', flexDirection: 'column',
+          position: 'sticky', top: 0, height: '100vh',
+          overflowY: 'auto',
+        }}
+          className="hidden-mobile admin-sidebar"
+        >
+          {/* Logo */}
+          <div style={{
+            padding: '24px 20px 20px',
+            borderBottom: '1px solid rgba(255,255,255,0.06)',
+            display: 'flex', alignItems: 'center', gap: 12,
+          }}>
+            <div style={{
+              width: 40, height: 40, borderRadius: 12,
+              background: 'linear-gradient(135deg, #681C2D 0%, #4A1420 100%)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              border: '1px solid rgba(184,149,90,0.3)',
+              flexShrink: 0,
+              boxShadow: '0 4px 12px rgba(104,28,45,0.4)',
+            }}>
+              <span style={{
+                fontFamily: "'Cormorant Garamond', Georgia, serif",
+                fontSize: 16, fontWeight: 800, color: '#B8955A',
+              }}>MB</span>
+            </div>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#FAF7F0', letterSpacing: '-.01em' }}>
+                Admin Panel
               </div>
-              <div>
-                <h1 className="font-display text-base font-bold text-[#FAF7F0] leading-none">
-                  Admin Panel
-                </h1>
-                <p className="text-[10px] text-stone-400 mt-1">Ajay Packers — Mirzapur</p>
+              <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>
+                Ajay Packers · Mirzapur
               </div>
             </div>
-
-            {/* Nav Links */}
-            <nav className="p-4 space-y-1 text-xs font-medium">
-              <Link
-                href="/admin"
-                className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-stone-300 hover:text-white hover:bg-stone-800 transition-colors"
-              >
-                <LayoutDashboard size={16} /> Overview
-              </Link>
-              <Link
-                href="/admin/products"
-                className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-stone-300 hover:text-white hover:bg-stone-800 transition-colors"
-              >
-                <Package size={16} /> Products Catalog
-              </Link>
-              <Link
-                href="/admin/orders"
-                className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-stone-300 hover:text-white hover:bg-stone-800 transition-colors"
-              >
-                <ShoppingCart size={16} /> Orders & Dispatch
-              </Link>
-              <Link
-                href="/admin/inventory"
-                className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-stone-300 hover:text-white hover:bg-stone-800 transition-colors"
-              >
-                <Warehouse size={16} /> Inventory Stock
-              </Link>
-              <Link
-                href="/admin/enquiries"
-                className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-stone-300 hover:text-white hover:bg-stone-800 transition-colors"
-              >
-                <MessageSquare size={16} /> Wholesale CRM
-              </Link>
-              <Link
-                href="/admin/customers"
-                className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-stone-300 hover:text-white hover:bg-stone-800 transition-colors"
-              >
-                <Users size={16} /> Customers
-              </Link>
-              <Link
-                href="/admin/coupons"
-                className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-stone-300 hover:text-white hover:bg-stone-800 transition-colors"
-              >
-                <Tag size={16} /> Coupons & Discounts
-              </Link>
-              <Link
-                href="/admin/settings"
-                className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-stone-300 hover:text-white hover:bg-stone-800 transition-colors"
-              >
-                <Settings size={16} /> Store Settings
-              </Link>
-            </nav>
           </div>
 
-          {/* User profile & Logout */}
-          <div className="p-4 border-t border-stone-800">
-            <div className="mb-3 px-3">
-              <p className="text-xs font-bold text-white truncate">{session.admin.name}</p>
-              <p className="text-[10px] text-[#B8955A] font-semibold uppercase">{session.admin.role.replace('_', ' ')}</p>
+          {/* Nav */}
+          <nav style={{ padding: '12px 10px', flex: 1 }}>
+            <div style={{
+              fontSize: 10, fontWeight: 700, color: 'rgba(255,255,255,0.25)',
+              letterSpacing: '.1em', textTransform: 'uppercase',
+              padding: '8px 10px 4px',
+            }}>
+              Management
             </div>
-            <form action="/api/admin/auth/logout" method="POST">
-              <button
-                type="submit"
-                className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-stone-800 hover:bg-rose-900 text-stone-300 hover:text-white rounded-lg text-xs font-semibold transition-colors"
+            {NAV.map(({ label, href, icon: Icon }) => (
+              <Link key={href} href={href} style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                padding: '10px 12px', borderRadius: 10, marginBottom: 2,
+                textDecoration: 'none', fontSize: 13.5, fontWeight: 500,
+                color: 'rgba(255,255,255,0.65)',
+                transition: 'all 0.15s ease',
+              }}
+                className="admin-nav-link"
               >
-                <LogOut size={14} /> Log Out
-              </button>
-            </form>
+                <Icon size={16} style={{ opacity: 0.7 }} />
+                {label}
+              </Link>
+            ))}
+          </nav>
+
+          {/* Footer / User */}
+          <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', padding: '14px 10px' }}>
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              padding: '10px 12px', borderRadius: 10,
+              background: 'rgba(255,255,255,0.04)', marginBottom: 6,
+            }}>
+              <div style={{
+                width: 32, height: 32, borderRadius: 8,
+                background: 'linear-gradient(135deg, #681C2D, #B8955A)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 12, fontWeight: 700, color: '#fff', flexShrink: 0,
+              }}>
+                {(session as any)?.name?.[0]?.toUpperCase() ?? 'A'}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 12.5, fontWeight: 600, color: '#FAF7F0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {(session as any)?.name ?? 'Admin'}
+                </div>
+                <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.35)' }}>Super Admin</div>
+              </div>
+            </div>
+            <Link href="/api/admin/auth/logout" style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              padding: '9px 12px', borderRadius: 8, textDecoration: 'none',
+              fontSize: 12.5, color: 'rgba(239,68,68,0.75)',
+              transition: 'background 0.15s',
+            }}
+              className="admin-logout-link"
+            >
+              <LogOut size={14} /> Sign Out
+            </Link>
           </div>
         </aside>
       )}
 
-      {/* Main admin content */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
+      {/* ─── MAIN CONTENT ───────────────────────────────── */}
+      <main style={{ flex: 1, minWidth: 0, overflowX: 'hidden' }}>
         {children}
-      </div>
+      </main>
+
+      <style>{`
+        .admin-nav-link:hover {
+          background: rgba(255,255,255,0.07) !important;
+          color: #FAF7F0 !important;
+        }
+        .admin-logout-link:hover {
+          background: rgba(239,68,68,0.08) !important;
+          color: rgb(239,68,68) !important;
+        }
+        @media (max-width: 768px) {
+          .admin-sidebar { display: none !important; }
+        }
+      `}</style>
     </div>
   );
 }
