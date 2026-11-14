@@ -6,7 +6,7 @@ on:
   pull_request:
     branches: [main, develop]
 
-# Cancel duplicate runs on the same branch to save free minutes
+# Cancel duplicate runs on the same branch — saves free minutes
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -14,7 +14,6 @@ concurrency:
 jobs:
   ci:
     name: Test & Build
-    # ubuntu-24.04 is free on public repos — no billing needed
     runs-on: ubuntu-24.04
     timeout-minutes: 20
 
@@ -38,7 +37,6 @@ jobs:
 
       - name: Lint
         run: pnpm lint
-        # Don't fail the whole pipeline on lint warnings
         continue-on-error: true
 
       - name: Run tests

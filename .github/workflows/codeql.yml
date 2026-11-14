@@ -3,45 +3,57 @@ name: CodeQL Analysis
 on:
   push:
     branches: [main]
-  pull_request:
-    branches: [main]
   schedule:
+    # Run weekly on Sunday at 2am UTC
     - cron: '0 2 * * 0'
 
 jobs:
   analyze:
-    name: CodeQL Analysis
-    runs-on: ubuntu-latest
+    name: CodeQL
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
       contents: read
       security-events: write
       actions: read
 
-    strategy:
-      fail-fast: false
-      matrix:
-        language: [typescript]
-
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
           languages: typescript
-          # If you wish to analyze more than one language at a time, check out
-          # the documentation for the matrix strategy in the next step.
+          queries: security-and-quality
 
-      - name: Autobuild
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'pnpm'
-        run: pnpm install && pnpm build
+      - name: Build for CodeQL
+        run: pnpm build
+        env:
+          NODE_ENV: production
+          NEXT_PUBLIC_APP_URL: http://localhost:3000
+          MONGODB_URI: mongodb://localhost:27017/mithaiboxes
+          NEXTAUTH_SECRET: ci-build-placeholder-secret
+          RESEND_API_KEY: re_placeholder
+          RAZORPAY_KEY_ID: rzp_test_placeholder
+          RAZORPAY_KEY_SECRET: placeholder_secret
+          OTP_SECRET: ci-otp-placeholder-secret
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
         with:
-          category: "/${{ matrix.language }}"
+          category: "/language:typescript"
