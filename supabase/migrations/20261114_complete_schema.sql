@@ -132,6 +132,7 @@ create table if not exists public.products (
   is_featured boolean default false,
   is_new_arrival boolean default false,
   is_bestseller boolean default false,
+  stock int default 0 check (stock >= 0),
   gst_percent numeric(5,2) default 12.00,
   hsn_code text default '48191010',
   weight_grams int,
@@ -140,6 +141,9 @@ create table if not exists public.products (
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
+
+-- Ensure stock column exists if table was already created in earlier run
+alter table public.products add column if not exists stock int default 0 check (stock >= 0);
 
 -- ====================================================================
 -- 6. PRODUCT IMAGES (Multi-image Gallery with Primary & Sort Order)
