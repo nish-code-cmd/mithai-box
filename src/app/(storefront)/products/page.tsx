@@ -1,9 +1,10 @@
 import React from 'react';
 import Link from 'next/link';
+import type { Metadata } from 'next';
 import { createClient } from '@/lib/supabase/server';
 import { ProductCard } from '@/components/product/ProductCard';
 import { ChevronRight, SlidersHorizontal } from 'lucide-react';
-import { CATEGORIES } from '@/lib/constants';
+import { CATEGORIES, BUSINESS } from '@/lib/constants';
 
 interface ProductsPageProps {
   searchParams: Promise<{
@@ -12,6 +13,24 @@ interface ProductsPageProps {
     page?: string;
     search?: string;
   }>;
+}
+
+export async function generateMetadata({ searchParams }: ProductsPageProps): Promise<Metadata> {
+  const params = await searchParams;
+  const categorySlug = params.category;
+  if (categorySlug) {
+    const matched = CATEGORIES.find((c) => c.slug === categorySlug);
+    if (matched) {
+      return {
+        title: `${matched.name} — Premium Packaging Collection | ${BUSINESS.brand}`,
+        description: `Explore premium handcrafted ${matched.name.toLowerCase()} manufactured by ${BUSINESS.manufacturer}, Mirzapur. Wholesale and custom bulk orders available.`,
+      };
+    }
+  }
+  return {
+    title: `All Packaging Products | ${BUSINESS.brand} — Ajay Packers`,
+    description: `Browse 40+ models of luxury mithai boxes, sweet packaging, dry fruit containers, and gift hampers. Direct manufacturer pricing from Mirzapur.`,
+  };
 }
 
 export default async function ProductsPage({ searchParams }: ProductsPageProps) {

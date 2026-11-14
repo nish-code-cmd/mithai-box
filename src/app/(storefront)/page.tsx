@@ -1,5 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
+import type { Metadata } from 'next';
 import {
   Package, Award, ShieldCheck, Truck, Sparkles, ArrowRight,
   Factory, CheckCircle2, Mail, Gem, Layers, Crown, Gift, Building2,
@@ -7,6 +8,30 @@ import {
 import { BUSINESS, COPY, CATEGORIES, FESTIVALS } from '@/lib/constants';
 import { ProductCard } from '@/components/product/ProductCard';
 import { createClient } from '@/lib/supabase/server';
+import { HeroSection } from '@/components/home/HeroSection';
+import { CategoryGrid } from '@/components/home/CategoryGrid';
+import { WhyChooseUs } from '@/components/home/WhyChooseUs';
+import { CelebrationCallout } from '@/components/home/CelebrationCallout';
+
+export const metadata: Metadata = {
+  title: `${BUSINESS.brand} — Premium Mithai & Sweet Box Packaging | Ajay Packers`,
+  description: `${BUSINESS.tagline} Manufacturer of luxury mithai boxes, dry fruit packaging, festive sweet boxes & corporate gifting solutions. ${BUSINESS.experience} years of craftsmanship from ${BUSINESS.address.city}, Uttar Pradesh.`,
+  keywords: 'mithai boxes, sweet box packaging, dry fruit boxes, festive packaging, wholesale sweet boxes, custom packaging India, Ajay Packers, Mirzapur packaging',
+  openGraph: {
+    title: `${BUSINESS.brand} — Premium Sweet Box Packaging`,
+    description: BUSINESS.tagline,
+    type: 'website',
+  },
+};
+
+const TRUST_ITEMS = [
+  { icon: Factory, text: 'Ajay Packers, Mirzapur' },
+  { icon: ShieldCheck, text: 'GSTIN Registered' },
+  { icon: Truck, text: 'Pan-India Dispatch' },
+  { icon: Award, text: '40 Years Heritage' },
+  { icon: Package, text: 'Food-Grade Safe' },
+  { icon: Sparkles, text: 'Premium Materials' },
+];
 
 async function getFeaturedProducts() {
   try {
@@ -27,15 +52,6 @@ async function getFeaturedProducts() {
   }
 }
 
-const TRUST_ITEMS = [
-  { icon: Factory, text: 'Ajay Packers, Mirzapur' },
-  { icon: ShieldCheck, text: 'GSTIN Registered' },
-  { icon: Truck, text: 'Pan-India Dispatch' },
-  { icon: Award, text: '40 Years Heritage' },
-  { icon: Package, text: 'Food-Grade Safe' },
-  { icon: Sparkles, text: 'Premium Materials' },
-];
-
 export default async function HomePage() {
   const featuredProducts = await getFeaturedProducts();
 
@@ -43,203 +59,9 @@ export default async function HomePage() {
     <div className="home-page flex flex-col min-h-screen overflow-x-hidden">
 
       {/* ════════════════════════════════════
-          1. HERO
+          1. HERO — animated client boundary
          ════════════════════════════════════ */}
-      <section
-        className="home-hero relative text-white overflow-hidden"
-        style={{
-          background: 'linear-gradient(135deg, #3A0D18 0%, #681C2D 45%, #8B2B3F 100%)',
-          display: 'flex',
-          alignItems: 'center',
-        }}
-      >
-        {/* Dot grid */}
-        <div
-          className="absolute inset-0 opacity-[0.06] pointer-events-none"
-          style={{ backgroundImage: 'radial-gradient(#B8955A 1px, transparent 1px)', backgroundSize: '28px 28px' }}
-        />
-        {/* Top-right radial glow */}
-        <div
-          className="absolute right-0 top-0 w-[60%] h-full opacity-20 pointer-events-none"
-          style={{ background: 'radial-gradient(ellipse at 70% 30%, #B8955A 0%, transparent 60%)' }}
-        />
-        {/* Bottom-left glow */}
-        <div
-          className="absolute left-0 bottom-0 w-[40%] h-[60%] opacity-10 pointer-events-none"
-          style={{ background: 'radial-gradient(ellipse at 20% 80%, #FAF7F0 0%, transparent 60%)' }}
-        />
-        {/* Corner ornament */}
-        <div className="absolute top-8 right-8 opacity-20 pointer-events-none hidden lg:block">
-          <svg width="120" height="120" viewBox="0 0 120 120" fill="none">
-            <circle cx="60" cy="60" r="55" stroke="#B8955A" strokeWidth="1" />
-            <circle cx="60" cy="60" r="40" stroke="#B8955A" strokeWidth="0.5" />
-            <line x1="60" y1="5" x2="60" y2="115" stroke="#B8955A" strokeWidth="0.5" />
-            <line x1="5" y1="60" x2="115" y2="60" stroke="#B8955A" strokeWidth="0.5" />
-          </svg>
-        </div>
-
-        <div className="site-container home-hero__inner relative z-10 w-full">
-          <div className="home-hero__grid grid grid-cols-1 lg:grid-cols-12 items-center">
-
-            {/* Left copy */}
-            <div className="home-hero__copy lg:col-span-7 space-y-8">
-              <div className="animate-fade-up">
-                <div
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-full border text-xs font-semibold uppercase tracking-widest"
-                  style={{ background: 'rgba(250,247,240,0.08)', borderColor: 'rgba(184,149,90,0.35)', color: '#CBA96E' }}
-                >
-                  <Sparkles size={12} className="text-[#B8955A]" />
-                  <span>40 Years of Packaging Excellence</span>
-                  <span className="w-1 h-1 rounded-full bg-[#B8955A]" />
-                  <span>Est. 1984</span>
-                </div>
-              </div>
-
-              <div className="animate-fade-up delay-100">
-                <h1
-                  className="font-display text-5xl sm:text-6xl lg:text-7xl font-bold leading-[1.05] tracking-tight"
-                  style={{ color: '#FAF7F0' }}
-                >
-                  {COPY.heroHeadline}
-                </h1>
-                <div
-                  className="mt-5 h-0.5 w-24 rounded-full"
-                  style={{ background: 'linear-gradient(90deg,#B8955A,rgba(184,149,90,0))' }}
-                />
-              </div>
-
-              <p
-                className="text-lg sm:text-xl leading-relaxed max-w-xl animate-fade-up delay-200"
-                style={{ color: 'rgba(237,228,214,0.85)' }}
-              >
-                {COPY.heroSubtext}
-              </p>
-
-              <div className="home-actions flex flex-wrap gap-4 pt-2 animate-fade-up delay-300">
-                <Link
-                  href="/products"
-                  className="group relative inline-flex items-center gap-2 px-8 py-4 rounded-xl font-semibold text-sm shadow-xl hover:shadow-2xl hover:opacity-90 transition-all duration-200"
-                  style={{ background: 'linear-gradient(135deg,#B8955A,#9A7A45)', color: '#fff' }}
-                >
-                  <span>{COPY.heroPrimaryBtn}</span>
-                  <ArrowRight size={16} className="transition-transform duration-200 group-hover:translate-x-1" />
-                </Link>
-                <Link
-                  href="/wholesale"
-                  className="inline-flex items-center gap-2 px-8 py-4 rounded-xl font-semibold text-sm border-2 hover:bg-white/10 transition-all duration-200"
-                  style={{ borderColor: 'rgba(250,247,240,0.25)', color: '#FAF7F0' }}
-                >
-                  {COPY.heroSecondaryBtn}
-                </Link>
-              </div>
-
-              {/* Trust strip */}
-              <div
-                className="home-trust pt-8 border-t grid grid-cols-3 gap-x-6 gap-y-4 text-xs animate-fade-up delay-400"
-                style={{ borderColor: 'rgba(255,255,255,0.10)', color: 'rgba(237,228,214,0.75)' }}
-              >
-                {[
-                  { Icon: Factory, text: 'Ajay Packers, Mirzapur' },
-                  { Icon: ShieldCheck, text: 'GSTIN Registered' },
-                  { Icon: Truck, text: 'Pan-India Delivery' },
-                ].map(({ Icon, text }) => (
-                  <div key={text} className="flex items-center gap-2">
-                    <Icon className="text-[#B8955A] flex-shrink-0" size={15} />
-                    <span>{text}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Right card */}
-            <div className="lg:col-span-5 animate-slide-right delay-200">
-              <div
-                className="relative rounded-3xl p-8 shadow-2xl animate-float"
-                style={{ background: '#FAF7F0', border: '2px solid rgba(184,149,90,0.35)' }}
-              >
-                <div
-                  className="absolute -top-3 left-8 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest shadow-lg"
-                  style={{ background: 'linear-gradient(90deg,#681C2D,#8B2B3F)', color: '#FAF7F0' }}
-                >
-                  Est. 1984
-                </div>
-                <div className="absolute top-5 right-5 opacity-15">
-                  <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
-                    <circle cx="24" cy="24" r="22" stroke="#B8955A" strokeWidth="1" />
-                    <path d="M24 2 L24 46 M2 24 L46 24" stroke="#B8955A" strokeWidth="0.5" />
-                  </svg>
-                </div>
-
-                <div className="space-y-5">
-                  <div>
-                    <p className="text-[10px] font-bold text-[#B8955A] uppercase tracking-widest mb-2">
-                      Ajay Packers Exclusive Collection
-                    </p>
-                    <h3 className="font-display text-2xl font-bold" style={{ color: '#681C2D' }}>
-                      Festive & Luxury<br />Sweet Packaging
-                    </h3>
-                  </div>
-
-                  {/* Secondary Visual Reference Asset */}
-                  <div className="relative aspect-[16/10] rounded-2xl overflow-hidden border border-[#EDE4D6] shadow-sm group">
-                    <img
-                      src="/images/editorial/Gemini_Generated_Image_jbsl4ljbsl4ljbsl.png"
-                      alt="Mithai Box Wala Premium Packaging Collection"
-                      className="w-full h-full object-cover object-center transition-transform duration-700 group-hover:scale-105"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent flex items-end p-3">
-                      <span className="text-[11px] font-semibold text-[#FAF7F0] drop-shadow">
-                        Signature Festive Collection · Ajay Packers
-                      </span>
-                    </div>
-                  </div>
-
-                  <p className="text-sm leading-relaxed" style={{ color: '#5C5855' }}>
-                    Trusted by halwais, sweet houses, gourmet confectioners,
-                    and corporate gifting specialists across India.
-                  </p>
-                  <ul className="space-y-3">
-                    {[
-                      'Rigid, folding & premium gourmet box structures',
-                      'Custom gold foil, embossing & brand logo printing',
-                      'Direct factory wholesale rates, bulk tier pricing',
-                    ].map((item) => (
-                      <li key={item} className="flex items-start gap-2.5 text-xs font-medium" style={{ color: '#3D3835' }}>
-                        <CheckCircle2 size={14} className="text-[#681C2D] flex-shrink-0 mt-0.5" />
-                        {item}
-                      </li>
-                    ))}
-                  </ul>
-                  <div
-                    className="pt-5 border-t flex items-center justify-between text-xs"
-                    style={{ borderColor: '#EDE4D6' }}
-                  >
-                    <div>
-                      <p className="font-bold" style={{ color: '#681C2D' }}>Ajay Kumar & Sanjay Kumar</p>
-                      <p style={{ color: '#8C8885' }}>Business Representatives</p>
-                    </div>
-                    <Link
-                      href="/about"
-                      className="flex items-center gap-1 text-[11px] font-bold transition-colors hover:text-[#B8955A]"
-                      style={{ color: '#681C2D' }}
-                    >
-                      Our Story <ArrowRight size={12} />
-                    </Link>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Wave bottom */}
-        <div className="absolute bottom-0 left-0 right-0" style={{ lineHeight: 0 }}>
-          <svg viewBox="0 0 1440 48" preserveAspectRatio="none" style={{ display: 'block', width: '100%', height: 48 }}>
-            <path d="M0,24 C360,48 1080,0 1440,24 L1440,48 L0,48 Z" fill="#FAF7F0" />
-          </svg>
-        </div>
-      </section>
-
+      <HeroSection />
 
       {/* ════════════════════════════════════
           2. TRUST MARQUEE STRIP
@@ -265,9 +87,31 @@ export default async function HomePage() {
         </div>
       </section>
 
+      {/* ════════════════════════════════════
+          3. TRUST BAR — text marquee strip
+         ════════════════════════════════════ */}
+      <section style={{ background: '#681C2D' }}>
+        <div className="overflow-hidden py-3">
+          <div className="marquee-track">
+            {[
+              '40 Years of Craft', 'Pan-India Delivery', 'Food-Grade Materials',
+              'Custom Printing', 'Wholesale Supply', 'GSTIN Registered',
+              '40 Years of Craft', 'Pan-India Delivery', 'Food-Grade Materials',
+              'Custom Printing', 'Wholesale Supply', 'GSTIN Registered',
+            ].map((item, i) => (
+              <div key={i} className="inline-flex items-center gap-5 mx-6 flex-shrink-0">
+                <span className="text-[11px] font-bold uppercase tracking-widest whitespace-nowrap text-[#EDE4D6]">
+                  {item}
+                </span>
+                <span className="text-[#B8955A] text-base">·</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
 
       {/* ════════════════════════════════════
-          3. SHOP BY CATEGORY
+          4. SHOP BY CATEGORY
          ════════════════════════════════════ */}
       <section className="section-py" style={{ background: '#FAF7F0' }}>
         <div className="site-container">
@@ -287,29 +131,12 @@ export default async function HomePage() {
             </p>
           </div>
 
-          <div className="category-grid grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-            {CATEGORIES.map((cat, i) => (
-              <Link
-                key={cat.slug}
-                href={`/categories/${cat.slug}`}
-                className="category-card group flex flex-col items-center justify-center gap-3 p-5 rounded-2xl text-center animate-fade-up bg-white border border-[#EDE4D6] hover:border-[#B8955A] hover:shadow-lg transition-all duration-300"
-                style={{ animationDelay: `${i * 60}ms` }}
-              >
-                <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl group-hover:scale-110 transition-transform duration-300 bg-gradient-to-br from-[#FAF7F0] to-[#EDE4D6]">
-                  {cat.emoji}
-                </div>
-                <span className="text-xs sm:text-sm font-semibold leading-tight transition-colors duration-200 group-hover:text-[#681C2D]" style={{ color: '#3D3835' }}>
-                  {cat.name}
-                </span>
-              </Link>
-            ))}
-          </div>
+          <CategoryGrid categories={CATEGORIES} />
         </div>
       </section>
 
-
       {/* ════════════════════════════════════
-          4. FEATURED PRODUCTS
+          5. FEATURED PRODUCTS
          ════════════════════════════════════ */}
       <section className="section-py" style={{ background: '#fff', borderTop: '1px solid #EDE4D6' }}>
         <div className="site-container">
@@ -368,9 +195,13 @@ export default async function HomePage() {
         </div>
       </section>
 
+      {/* ════════════════════════════════════
+          6. HANDCRAFTED CALLOUT — secondary image
+         ════════════════════════════════════ */}
+      <CelebrationCallout />
 
       {/* ════════════════════════════════════
-          5. FESTIVAL & OCCASION COLLECTIONS
+          7. FESTIVAL & OCCASION COLLECTIONS
          ════════════════════════════════════ */}
       <section
         className="section-py relative overflow-hidden"
@@ -391,7 +222,7 @@ export default async function HomePage() {
               <span>Celebrations</span>
             </div>
             <h2 className="font-display text-3xl sm:text-4xl font-bold" style={{ color: '#681C2D' }}>
-              Festive & Wedding Packaging
+              Festive &amp; Wedding Packaging
             </h2>
             <p className="text-sm mt-3" style={{ color: '#5C5855' }}>
               Specialized packaging lines engineered for India's grandest celebrations and gifting moments.
@@ -405,7 +236,6 @@ export default async function HomePage() {
                 className="festival-card group relative bg-white rounded-2xl p-7 flex flex-col justify-between overflow-hidden border border-[#EDE4D6] hover:border-[#B8955A] hover:shadow-xl transition-all duration-300 animate-fade-up"
                 style={{ animationDelay: `${i * 100}ms` }}
               >
-                {/* Top accent line revealed on hover */}
                 <div
                   className="absolute top-0 left-0 right-0 h-1 rounded-t-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"
                   style={{ background: 'linear-gradient(90deg,#681C2D,#B8955A)' }}
@@ -429,7 +259,7 @@ export default async function HomePage() {
                     {f.name}
                   </h3>
                   <p className="text-xs leading-relaxed" style={{ color: '#5C5855' }}>
-                    Curated festive rigid boxes, dry-fruit tins & sweet packaging with custom foiling.
+                    Curated festive rigid boxes, dry-fruit tins &amp; sweet packaging with custom foiling.
                   </p>
                 </div>
 
@@ -446,9 +276,13 @@ export default async function HomePage() {
         </div>
       </section>
 
+      {/* ════════════════════════════════════
+          8. WHY CHOOSE US
+         ════════════════════════════════════ */}
+      <WhyChooseUs />
 
       {/* ════════════════════════════════════
-          6. HERITAGE / ABOUT AJAY PACKERS
+          9. HERITAGE / ABOUT AJAY PACKERS
          ════════════════════════════════════ */}
       <section className="section-py" style={{ background: '#fff', borderTop: '1px solid #EDE4D6' }}>
         <div className="site-container">
@@ -552,9 +386,8 @@ export default async function HomePage() {
         </div>
       </section>
 
-
       {/* ════════════════════════════════════
-          7. WHOLESALE CTA BANNER
+          10. WHOLESALE CTA BANNER
          ════════════════════════════════════ */}
       <section
         className="home-cta relative overflow-hidden"
@@ -576,7 +409,7 @@ export default async function HomePage() {
               style={{ background: 'rgba(184,149,90,0.2)', color: '#CBA96E', borderColor: 'rgba(184,149,90,0.3)' }}
             >
               <Building2 size={11} />
-              <span>B2B & Wholesale Orders</span>
+              <span>B2B &amp; Wholesale Orders</span>
             </div>
             <h2 className="font-display text-3xl sm:text-4xl lg:text-5xl font-bold max-w-3xl mx-auto" style={{ color: '#FAF7F0' }}>
               Need Bulk Packaging for Your Sweet Brand or Festive Season?
@@ -585,7 +418,7 @@ export default async function HomePage() {
 
           <p className="text-base max-w-xl mx-auto animate-fade-up delay-100" style={{ color: 'rgba(237,228,214,0.8)' }}>
             Custom tier-based pricing for quantities exceeding 500 units. Talk directly to
-            {' '}<strong className="text-[#CBA96E]">Ajay Kumar & Sanjay Kumar</strong>.
+            {' '}<strong className="text-[#CBA96E]">Ajay Kumar &amp; Sanjay Kumar</strong>.
           </p>
 
           <div className="flex flex-wrap items-center justify-center gap-4 pt-2 animate-fade-up delay-200">

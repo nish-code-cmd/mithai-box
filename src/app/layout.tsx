@@ -73,31 +73,62 @@ export default function RootLayout({
           href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Inter:wght@400;500;600;700&display=swap"
           rel="stylesheet"
         />
-        {/* JSON-LD: Organization structured data */}
+        {/* JSON-LD: Structured Data (Organization, WebSite & LocalBusiness) */}
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
-              '@context': 'https://schema.org',
-              '@type': 'Organization',
-              name: BUSINESS.brand,
-              alternateName: BUSINESS.manufacturer,
-              url: 'https://www.mithaiboxes.com',
-              email: BUSINESS.email,
-              address: {
-                '@type': 'PostalAddress',
-                streetAddress: BUSINESS.address.line1,
-                addressLocality: BUSINESS.address.city,
-                addressRegion: BUSINESS.address.state,
-                postalCode: BUSINESS.address.pincode,
-                addressCountry: 'IN',
+            __html: JSON.stringify([
+              {
+                '@context': 'https://schema.org',
+                '@type': 'Organization',
+                name: BUSINESS.brand,
+                alternateName: BUSINESS.manufacturer,
+                url: 'https://www.mithaiboxes.com',
+                logo: 'https://www.mithaiboxes.com/images/editorial/Gemini_Generated_Image_3w4lsp3w4lsp3w4l.png',
+                email: BUSINESS.email,
+                address: {
+                  '@type': 'PostalAddress',
+                  streetAddress: BUSINESS.address.line1,
+                  addressLocality: BUSINESS.address.city,
+                  addressRegion: BUSINESS.address.state,
+                  postalCode: BUSINESS.address.pincode,
+                  addressCountry: 'IN',
+                },
+                description:
+                  'Premium mithai boxes, sweet packaging, dry fruit boxes, and customized packaging manufacturer with 40 years of experience.',
+                foundingDate: '1984',
+                sameAs: ['https://www.mithaiboxes.com'],
               },
-              description:
-                'Premium mithai boxes, sweet packaging, and customized packaging manufacturer with 40 years of experience.',
-              foundingDate: '1984',
-              numberOfEmployees: { '@type': 'QuantitativeValue' },
-              sameAs: ['https://www.mithaiboxes.com'],
-            }),
+              {
+                '@context': 'https://schema.org',
+                '@type': 'WebSite',
+                url: 'https://www.mithaiboxes.com',
+                name: BUSINESS.brand,
+                potentialAction: {
+                  '@type': 'SearchAction',
+                  target: 'https://www.mithaiboxes.com/products?search={search_term_string}',
+                  'query-input': 'required name=search_term_string',
+                },
+              },
+              {
+                '@context': 'https://schema.org',
+                '@type': 'LocalBusiness',
+                name: `${BUSINESS.brand} by ${BUSINESS.manufacturer}`,
+                image: 'https://www.mithaiboxes.com/images/editorial/Gemini_Generated_Image_3w4lsp3w4lsp3w4l.png',
+                url: 'https://www.mithaiboxes.com',
+                email: BUSINESS.email,
+                address: {
+                  '@type': 'PostalAddress',
+                  streetAddress: BUSINESS.address.line1,
+                  addressLocality: BUSINESS.address.city,
+                  addressRegion: BUSINESS.address.state,
+                  postalCode: BUSINESS.address.pincode,
+                  addressCountry: 'IN',
+                },
+                priceRange: '₹₹',
+                openingHours: 'Mo-Sa 10:00-18:00',
+              },
+            ]),
           }}
         />
       </head>

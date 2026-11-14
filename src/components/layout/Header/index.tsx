@@ -592,6 +592,7 @@ export function Header() {
                 className="show-desktop"
                 aria-label="Wishlist"
                 style={{
+                  display: 'flex',
                   width: 40,
                   height: 40,
                   borderRadius: 10,
@@ -685,6 +686,8 @@ export function Header() {
               <button
                 onClick={() => setMobile(!mobile)}
                 className="hide-desktop"
+                aria-expanded={mobile}
+                aria-controls="mobile-navigation-drawer"
                 aria-label={mobile ? 'Close menu' : 'Open menu'}
                 style={{
                   width: 40,
@@ -721,6 +724,10 @@ export function Header() {
             }}
           />
           <div
+            id="mobile-navigation-drawer"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Mobile Navigation Menu"
             style={{
               position: 'fixed',
               top: 0,
@@ -751,16 +758,23 @@ export function Header() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div
                   style={{
-                    width: 36,
-                    height: 36,
+                    width: 40,
+                    height: 40,
                     borderRadius: 10,
-                    background: 'rgba(184,149,90,0.25)',
+                    overflow: 'hidden',
+                    background: '#681C2D',
+                    border: '1.5px solid rgba(184,149,90,0.5)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
+                    flexShrink: 0,
                   }}
                 >
-                  <Package size={18} color="#B8955A" />
+                  <img
+                    src="/images/editorial/Gemini_Generated_Image_3w4lsp3w4lsp3w4l.png"
+                    alt="Mithai Box Wala Official Logo"
+                    style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                  />
                 </div>
                 <div>
                   <div style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 18, fontWeight: 700 }}>

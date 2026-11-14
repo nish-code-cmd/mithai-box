@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { BUSINESS } from '@/lib/constants';
 
@@ -22,9 +23,9 @@ const FOOTER_LINKS = {
   ],
   policies: [
     { label: 'Privacy Policy', href: '/privacy-policy' },
-    { label: 'Terms & Conditions', href: '/terms-and-conditions' },
+    { label: 'Terms & Conditions', href: '/terms' },
     { label: 'Shipping Policy', href: '/shipping-policy' },
-    { label: 'Return Policy', href: '/return-policy' },
+    { label: 'Return Policy', href: '/returns-policy' },
   ],
 };
 
@@ -50,9 +51,37 @@ function FooterLink({ href, children }: { href: string; children: React.ReactNod
 
 export function Footer() {
   const year = new Date().getFullYear();
+  const [newsletterEmail, setNewsletterEmail] = useState('');
+  const [newsletterStatus, setNewsletterStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [newsletterMsg, setNewsletterMsg] = useState('');
+
+  const handleNewsletter = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newsletterEmail.trim()) return;
+    setNewsletterStatus('loading');
+    try {
+      const res = await fetch('/api/newsletter', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: newsletterEmail.trim().toLowerCase() }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setNewsletterStatus('success');
+        setNewsletterMsg('Thank you for subscribing!');
+        setNewsletterEmail('');
+      } else {
+        setNewsletterStatus('error');
+        setNewsletterMsg(data.error || 'Failed to subscribe. Please try again.');
+      }
+    } catch {
+      setNewsletterStatus('error');
+      setNewsletterMsg('Something went wrong. Please try again.');
+    }
+  };
 
   return (
-    <footer style={{ background: '#1A1714', color: '#EDE4D6' }}>
+    <footer role="contentinfo" style={{ background: '#1A1714', color: '#EDE4D6' }}>
 
       {/* Pre-footer CTA Strip */}
       <div style={{
@@ -290,12 +319,15 @@ export function Footer() {
                 Festive offers, new arrivals &amp; bulk deal alerts.
               </p>
               <form
-                onSubmit={(e) => { e.preventDefault(); }}
+                onSubmit={handleNewsletter}
                 style={{ display: 'flex', flexDirection: 'column', gap: 8 }}
               >
                 <input
                   type="email"
+                  value={newsletterEmail}
+                  onChange={(e) => setNewsletterEmail(e.target.value)}
                   placeholder="Your email address"
+                  required
                   style={{
                     padding: '10px 14px',
                     borderRadius: 10,
@@ -310,6 +342,7 @@ export function Footer() {
                 />
                 <button
                   type="submit"
+                  disabled={newsletterStatus === 'loading'}
                   style={{
                     padding: '10px 14px',
                     borderRadius: 10,
@@ -318,13 +351,23 @@ export function Footer() {
                     color: '#FAF7F0',
                     fontSize: 12,
                     fontWeight: 600,
-                    cursor: 'pointer',
+                    cursor: newsletterStatus === 'loading' ? 'not-allowed' : 'pointer',
                     letterSpacing: '.05em',
                     transition: 'opacity .15s',
                   }}
                 >
-                  Subscribe
+                  {newsletterStatus === 'loading' ? 'Subscribing…' : 'Subscribe'}
                 </button>
+                {newsletterStatus === 'success' && (
+                  <p style={{ fontSize: 12, color: '#4ADE80', margin: '4px 0 0' }}>
+                    ✓ {newsletterMsg}
+                  </p>
+                )}
+                {newsletterStatus === 'error' && (
+                  <p style={{ fontSize: 12, color: '#F87171', margin: '4px 0 0' }}>
+                    ✕ {newsletterMsg}
+                  </p>
+                )}
               </form>
             </div>
           </div>

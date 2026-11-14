@@ -56,9 +56,17 @@ const CSS = `
 .spinner { animation: spin 0.9s linear infinite; }
 .otp-pop  { animation: otpPop 0.2s ease both; }
 .gradient-bg {
-  background: linear-gradient(-45deg, #3A0D18, #681C2D, #4A1420, #8B2B3F);
+  background: linear-gradient(-45deg, #2D0B13, #4A1420, #380E17, #5C1927);
   background-size: 400% 400%;
-  animation: gradientShift 8s ease infinite;
+  animation: gradientShift 12s ease infinite;
+}
+
+@media (max-width: 899px) {
+  .auth-left-panel { display: none !important; }
+  .auth-right-panel { width: 100% !important; max-width: 480px !important; margin: 0 auto !important; }
+}
+@media (min-width: 900px) {
+  .auth-mobile-header { display: none !important; }
 }
 `;
 
@@ -197,52 +205,248 @@ export default function AuthPage() {
           borderRadius: '50%', background: 'rgba(184,149,90,0.06)', pointerEvents: 'none',
         }} />
 
-        <div style={{ width: '100%', maxWidth: 440, position: 'relative', zIndex: 1 }}>
+        <div style={{ width: '100%', maxWidth: 960, position: 'relative', zIndex: 1, margin: '20px auto' }}>
 
-          {/* Logo */}
-          <div style={{ textAlign: 'center', marginBottom: 24 }} className="fade-in">
-            <div
-              className="float-icon"
-              style={{
-                width: 72, height: 72, borderRadius: 20,
-                overflow: 'hidden',
-                background: '#681C2D',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                margin: '0 auto 16px', boxShadow: '0 12px 40px rgba(0,0,0,0.25)',
-                border: '1.5px solid rgba(184,149,90,0.5)',
-              }}
-            >
-              <img
-                src="/images/editorial/Gemini_Generated_Image_3w4lsp3w4lsp3w4l.png"
-                alt="Mithai Box Wala Official Logo"
-                style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-              />
-            </div>
-            <h1 style={{
-              fontFamily: "'Cormorant Garamond', Georgia, serif",
-              fontSize: 26, fontWeight: 700, color: '#fff', margin: 0, lineHeight: 1.2,
-            }}>
-              Mithai Box Wala
-            </h1>
-            <p style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.6)', margin: '5px 0 0' }}>
-              by Ajay Packers · Est. 1984
-            </p>
-          </div>
-
-          {/* Card */}
+          {/* Main Card with Two-Column Split */}
           <div
             className="auth-card"
             style={{
-              background: '#fff', borderRadius: 24, overflow: 'hidden',
-              boxShadow: '0 32px 80px rgba(0,0,0,0.3), 0 0 0 1px rgba(255,255,255,0.08)',
+              background: '#fff',
+              borderRadius: 24,
+              overflow: 'hidden',
+              boxShadow: '0 32px 80px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.1)',
+              display: 'flex',
+              minHeight: 580,
             }}
           >
-            {/* Tab switcher */}
-            {step === 'form' && (
-              <div style={{
-                display: 'flex', background: C.ivory,
-                borderBottom: `1px solid ${C.beige}`,
-              }}>
+            {/* ── LEFT PANEL (Desktop Brand Editorial) ── */}
+            <div
+              className="auth-left-panel"
+              style={{
+                width: '44%',
+                background: 'linear-gradient(145deg, #3A0D18 0%, #681C2D 55%, #4A1420 100%)',
+                padding: '40px 32px',
+                color: '#FAF7F0',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                position: 'relative',
+                overflow: 'hidden',
+                borderRight: '1px solid rgba(184,149,90,0.3)',
+              }}
+            >
+              {/* Subtle background ornamentation */}
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  opacity: 0.08,
+                  backgroundImage: 'radial-gradient(#B8955A 1px, transparent 1px)',
+                  backgroundSize: '20px 20px',
+                  pointerEvents: 'none',
+                }}
+              />
+
+              <div style={{ position: 'relative', zIndex: 2 }}>
+                {/* Brand Logo & Title */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20 }}>
+                  <div
+                    style={{
+                      width: 52,
+                      height: 52,
+                      borderRadius: 14,
+                      overflow: 'hidden',
+                      background: '#681C2D',
+                      border: '1.5px solid rgba(184,149,90,0.6)',
+                      boxShadow: '0 6px 20px rgba(0,0,0,0.3)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <img
+                      src="/images/editorial/Gemini_Generated_Image_3w4lsp3w4lsp3w4l.png"
+                      alt="Mithai Box Wala Official Logo"
+                      style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                    />
+                  </div>
+                  <div>
+                    <h2
+                      style={{
+                        fontFamily: "'Cormorant Garamond', Georgia, serif",
+                        fontSize: 22,
+                        fontWeight: 700,
+                        color: '#fff',
+                        margin: 0,
+                        lineHeight: 1.15,
+                      }}
+                    >
+                      Mithai Box Wala
+                    </h2>
+                    <p
+                      style={{
+                        fontSize: 10,
+                        color: '#CBA96E',
+                        letterSpacing: '.12em',
+                        textTransform: 'uppercase',
+                        fontWeight: 600,
+                        margin: '3px 0 0',
+                      }}
+                    >
+                      by Ajay Packers · Est. 1984
+                    </p>
+                  </div>
+                </div>
+
+                <p
+                  style={{
+                    fontSize: 13.5,
+                    color: 'rgba(250,247,240,0.85)',
+                    lineHeight: 1.6,
+                    margin: '0 0 24px',
+                    fontStyle: 'italic',
+                    borderLeft: '2px solid #B8955A',
+                    paddingLeft: 12,
+                  }}
+                >
+                  "The Perfection of Your Sweets, Paired with Our Ultimate Packaging."
+                </p>
+
+                {/* Secondary Visual Reference Feature Card */}
+                <div
+                  style={{
+                    background: 'rgba(255,255,255,0.06)',
+                    borderRadius: 16,
+                    padding: 10,
+                    border: '1px solid rgba(184,149,90,0.3)',
+                    boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
+                    marginBottom: 20,
+                  }}
+                >
+                  <div
+                    style={{
+                      height: 140,
+                      borderRadius: 12,
+                      overflow: 'hidden',
+                      position: 'relative',
+                      background: '#4A1420',
+                    }}
+                  >
+                    <img
+                      src="/images/editorial/Gemini_Generated_Image_jbsl4ljbsl4ljbsl.png"
+                      alt="Luxury Mithai Box Packaging Presentation"
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover',
+                      }}
+                    />
+                    <div
+                      style={{
+                        position: 'absolute',
+                        inset: 0,
+                        background: 'linear-gradient(to top, rgba(36,33,31,0.8) 0%, transparent 60%)',
+                      }}
+                    />
+                    <span
+                      style={{
+                        position: 'absolute',
+                        bottom: 8,
+                        left: 10,
+                        right: 10,
+                        fontSize: 10.5,
+                        fontWeight: 600,
+                        color: '#FAF7F0',
+                        letterSpacing: '.04em',
+                      }}
+                    >
+                      ✦ Master-crafted festive collections
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Trust bullet points */}
+              <div style={{ position: 'relative', zIndex: 2 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {[
+                    '40 Years Manufacturing Heritage in Mirzapur',
+                    'Direct Wholesale & Custom Logo Foil Stamping',
+                    '100% Certified Food-Grade Safe Materials',
+                  ].map((text) => (
+                    <div key={text} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ color: '#CBA96E', fontSize: 13 }}>✦</span>
+                      <span style={{ fontSize: 11.5, color: 'rgba(250,247,240,0.8)' }}>{text}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* ── RIGHT PANEL (Auth Interaction Form) ── */}
+            <div
+              className="auth-right-panel"
+              style={{
+                width: '56%',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                background: '#ffffff',
+              }}
+            >
+              <div>
+                {/* Mobile Header (shown only on small screens) */}
+                <div
+                  className="auth-mobile-header"
+                  style={{
+                    padding: '24px 20px 16px',
+                    textAlign: 'center',
+                    background: 'linear-gradient(135deg, #4A1420 0%, #681C2D 100%)',
+                    color: '#FAF7F0',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 50,
+                      height: 50,
+                      borderRadius: 12,
+                      overflow: 'hidden',
+                      margin: '0 auto 10px',
+                      background: '#681C2D',
+                      border: '1.5px solid rgba(184,149,90,0.5)',
+                    }}
+                  >
+                    <img
+                      src="/images/editorial/Gemini_Generated_Image_3w4lsp3w4lsp3w4l.png"
+                      alt="Mithai Box Wala Official Logo"
+                      style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                    />
+                  </div>
+                  <h1
+                    style={{
+                      fontFamily: "'Cormorant Garamond', Georgia, serif",
+                      fontSize: 22,
+                      fontWeight: 700,
+                      margin: 0,
+                    }}
+                  >
+                    {BUSINESS.brand}
+                  </h1>
+                  <p style={{ fontSize: 11, color: '#CBA96E', margin: '2px 0 0', textTransform: 'uppercase' }}>
+                    by Ajay Packers · Est. 1984
+                  </p>
+                </div>
+
+                {/* Tab switcher */}
+                {step === 'form' && (
+                  <div
+                    style={{
+                      display: 'flex',
+                      background: C.ivory,
+                      borderBottom: `1px solid ${C.beige}`,
+                    }}
+                  >
                 {(['login', 'signup'] as const).map(t => (
                   <button key={t} onClick={() => switchMode(t)} style={{
                     flex: 1, padding: '16px 0', border: 'none', cursor: 'pointer',
@@ -503,20 +707,22 @@ export default function AuthPage() {
                 }} />
               </div>
             )}
+              </div>
 
-            {/* Footer trust strip */}
-            <div style={{
-              padding: '12px 24px', background: C.ivory, borderTop: `1px solid ${C.beige}`,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16, flexWrap: 'wrap',
-            }}>
-              {[
-                { icon: <ShieldCheck size={13} color="#166534" />, text: 'SSL Encrypted' },
-                { icon: <Lock size={12} color={C.gold} />, text: 'HttpOnly Session' },
-              ].map(({ icon, text }) => (
-                <div key={text} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: C.muted }}>
-                  {icon} {text}
-                </div>
-              ))}
+              {/* Footer trust strip */}
+              <div style={{
+                padding: '12px 24px', background: C.ivory, borderTop: `1px solid ${C.beige}`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16, flexWrap: 'wrap',
+              }}>
+                {[
+                  { icon: <ShieldCheck size={13} color="#166534" />, text: 'SSL Encrypted' },
+                  { icon: <Lock size={12} color={C.gold} />, text: 'HttpOnly Session' },
+                ].map(({ icon, text }) => (
+                  <div key={text} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: C.muted }}>
+                    {icon} {text}
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
 
