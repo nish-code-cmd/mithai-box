@@ -1,37 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminAuth } from '@/lib/auth/session';
-import { connectDB } from '@/lib/db/connect';
-import { Category, Product } from '@/models';
+import { getAdminClient } from '@/lib/supabase/admin';
 
 type Params = { params: Promise<{ id: string }> };
 
 export async function PUT(req: NextRequest, { params }: Params) {
   try {
-    await requireAdminAuth(['super_admin', 'catalog_manager']);
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : 'Unauthorized';
-    return NextResponse.json({ error: msg }, { status: msg === 'FORBIDDEN' ? 403 : 401 });
+    await requireAdminAuth(['admin', 'superadmin']);
+  } catch {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   const { id } = await params;
 
-  let body: unknown;
   try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
-  }
+    const body = await req.json();
+    const admin = getAdminClient();
 
-  try {
-    await connectDB();
+    const { data: category, error } = await admin
+      .from('categories')
+      .update(body)
+      .eq('id', id)
+      .select()
+      .single();
 
-    const category = await Category.findByIdAndUpdate(id, body as object, {
-      new: true,
-      runValidators: true,
-    }).lean();
-
-    if (!category) {
-      return NextResponse.json({ error: 'Category not found' }, { status: 404 });
+    if (error || !category) {
+      return NextResponse.json({ error: 'Category not found or update failed' }, { status: 404 });
     }
 
     return NextResponse.json({ category });
@@ -43,29 +37,22 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
 export async function DELETE(_req: NextRequest, { params }: Params) {
   try {
-    await requireAdminAuth(['super_admin', 'catalog_manager']);
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : 'Unauthorized';
-    return NextResponse.json({ error: msg }, { status: msg === 'FORBIDDEN' ? 403 : 401 });
+    await requireAdminAuth(['admin', 'superadmin']);
+  } catch {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   const { id } = await params;
 
   try {
-    await connectDB();
+    const admin = getAdminClient();
+    const { error } = await admin
+      .from('categories')
+      .update({ is_active: false })
+      .eq('id', id);
 
-    // Check no active products in this category
-    const activeProductsCount = await Product.countDocuments({ category: id, isActive: true });
-    if (activeProductsCount > 0) {
-      return NextResponse.json(
-        { error: `Cannot archive: ${activeProductsCount} active product(s) are in this category` },
-        { status: 409 }
-      );
-    }
-
-    const category = await Category.findByIdAndUpdate(id, { isActive: false }, { new: true }).lean();
-    if (!category) {
-      return NextResponse.json({ error: 'Category not found' }, { status: 404 });
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
     return NextResponse.json({ success: true, message: 'Category archived' });

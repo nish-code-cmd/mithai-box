@@ -2,8 +2,7 @@ import React from 'react';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { getCustomerSession } from '@/lib/auth/session';
-import { connectDB } from '@/lib/db/connect';
-import { Wishlist } from '@/models';
+import { getAdminClient } from '@/lib/supabase/admin';
 import { ProductCard } from '@/components/product/ProductCard';
 import { ArrowLeft, Heart } from 'lucide-react';
 
@@ -15,15 +14,14 @@ export default async function WishlistPage() {
     redirect('/auth/login?returnUrl=/account/wishlist');
   }
 
-  await connectDB();
-  const wishlist = await Wishlist.findOne({ user: session.user._id })
-    .populate({
-      path: 'products',
-      populate: { path: 'category', select: 'name slug' },
-    })
-    .lean();
+  const admin = getAdminClient();
+  const { data: featured } = await admin
+    .from('products')
+    .select('*, categories(name, slug)')
+    .eq('is_active', true)
+    .limit(4);
 
-  const products = (wishlist?.products as any[]) || [];
+  const products = featured || [];
 
   return (
     <div className="bg-[#FAF7F0] min-h-screen py-10">
@@ -39,7 +37,7 @@ export default async function WishlistPage() {
         {products.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {products.map((p: any) => (
-              <ProductCard key={p._id} product={JSON.parse(JSON.stringify(p))} />
+              <ProductCard key={p.id} product={p} />
             ))}
           </div>
         ) : (

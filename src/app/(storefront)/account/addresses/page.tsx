@@ -2,9 +2,8 @@ import React from 'react';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { getCustomerSession } from '@/lib/auth/session';
-import { connectDB } from '@/lib/db/connect';
-import { Address } from '@/models';
-import { ArrowLeft, MapPin, Plus } from 'lucide-react';
+import { getAdminClient } from '@/lib/supabase/admin';
+import { ArrowLeft, MapPin } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,8 +13,14 @@ export default async function AddressesPage() {
     redirect('/auth/login?returnUrl=/account/addresses');
   }
 
-  await connectDB();
-  const addresses = await Address.find({ user: session.user._id }).lean();
+  const admin = getAdminClient();
+  const { data: addressesData } = await admin
+    .from('addresses')
+    .select('*')
+    .eq('user_id', session.user.id || session.user._id)
+    .order('is_default', { ascending: false });
+
+  const addresses = addressesData || [];
 
   return (
     <div className="bg-[#FAF7F0] min-h-screen py-10">
@@ -32,8 +37,8 @@ export default async function AddressesPage() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
           {addresses.map((addr: any) => (
-            <div key={addr._id} className="bg-white border border-[#EDE4D6] rounded-2xl p-6 shadow-sm relative">
-              {addr.isDefault && (
+            <div key={addr.id} className="bg-white border border-[#EDE4D6] rounded-2xl p-6 shadow-sm relative">
+              {addr.is_default && (
                 <span className="absolute top-4 right-4 bg-[#681C2D] text-white text-[10px] font-bold px-2 py-0.5 rounded">
                   Default
                 </span>
@@ -41,9 +46,9 @@ export default async function AddressesPage() {
               <div className="flex items-start gap-3">
                 <MapPin className="text-[#B8955A] mt-1 flex-shrink-0" size={18} />
                 <div className="text-xs text-stone-600 space-y-1">
-                  <p className="text-sm font-bold text-stone-900">{addr.fullName}</p>
-                  <p>{addr.addressLine1}</p>
-                  {addr.addressLine2 && <p>{addr.addressLine2}</p>}
+                  <p className="text-sm font-bold text-stone-900">{addr.name}</p>
+                  <p>{addr.line1}</p>
+                  {addr.line2 && <p>{addr.line2}</p>}
                   <p>{addr.city}, {addr.state} – {addr.pincode}</p>
                   <p className="pt-2 font-medium">Contact: {addr.phone}</p>
                 </div>

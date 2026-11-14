@@ -2,11 +2,9 @@ import React from 'react';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { getAdminSession } from '@/lib/auth/session';
-import { connectDB } from '@/lib/db/connect';
-import { Order, Product, User, Inventory, WholesaleEnquiry } from '@/models';
+import { getAdminClient } from '@/lib/supabase/admin';
 import {
   DollarSign, ShoppingCart, Package, Users, AlertTriangle,
-  Clock, ArrowUpRight, CheckCircle2, ChevronRight
 } from 'lucide-react';
 import { ORDER_STATUS_LABELS, ORDER_STATUS_COLORS } from '@/lib/constants';
 
@@ -18,30 +16,38 @@ export default async function AdminDashboardPage() {
     redirect('/admin/login');
   }
 
-  await connectDB();
+  const adminClient = getAdminClient();
 
-  // Fetch real database metrics
+  // Fetch real database metrics from Supabase in parallel
   const [
-    totalOrders,
-    paidOrders,
-    productCount,
-    customerCount,
-    lowStockCount,
-    recentOrders,
-    newEnquiriesCount,
+    ordersCountRes,
+    paidOrdersRes,
+    productCountRes,
+    customerCountRes,
+    lowStockRes,
+    recentOrdersRes,
+    newEnquiriesRes,
   ] = await Promise.all([
-    Order.countDocuments(),
-    Order.find({ paymentStatus: 'paid' }).select('grandTotal').lean(),
-    Product.countDocuments({ isActive: true }),
-    User.countDocuments({ isActive: true }),
-    Inventory.countDocuments({
-      $expr: { $lte: [{ $subtract: ['$quantityOnHand', '$quantityReserved'] }, '$lowStockThreshold'] },
-    }),
-    Order.find().sort({ createdAt: -1 }).limit(8).lean(),
-    WholesaleEnquiry.countDocuments({ status: 'new' }),
+    adminClient.from('orders').select('id', { count: 'exact', head: true }),
+    adminClient.from('orders').select('total_amount').eq('payment_status', 'paid'),
+    adminClient.from('products').select('id', { count: 'exact', head: true }).eq('is_active', true),
+    adminClient.from('profiles').select('id', { count: 'exact', head: true }).eq('role', 'customer'),
+    adminClient.from('products').select('id, name, stock, low_stock_threshold').filter('stock', 'lte', 'low_stock_threshold').eq('is_active', true),
+    adminClient.from('orders').select('*, profiles(name, phone)').order('created_at', { ascending: false }).limit(8),
+    adminClient.from('wholesale_enquiries').select('id', { count: 'exact', head: true }).eq('status', 'new'),
   ]);
 
-  const totalRevenue = paidOrders.reduce((sum: number, o: any) => sum + (o.grandTotal || 0), 0);
+  const totalOrders = ordersCountRes.count ?? 0;
+  const productCount = productCountRes.count ?? 0;
+  const customerCount = customerCountRes.count ?? 0;
+  const lowStockCount = lowStockRes.data?.length ?? 0;
+  const recentOrders = recentOrdersRes.data ?? [];
+  const newEnquiriesCount = newEnquiriesRes.count ?? 0;
+
+  const totalRevenue = (paidOrdersRes.data ?? []).reduce(
+    (sum, o) => sum + (o.total_amount || 0),
+    0
+  );
 
   return (
     <div className="p-6 sm:p-10 space-y-8 max-w-7xl mx-auto w-full">
@@ -157,32 +163,40 @@ export default async function AdminDashboardPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#EDE4D6]">
-                {recentOrders.map((o: any) => (
-                  <tr key={o._id} className="hover:bg-[#FAF7F0] transition-colors">
-                    <td className="py-3 font-mono font-bold text-[#681C2D]">#{o.orderNumber}</td>
-                    <td className="py-3">
-                      <p className="font-semibold text-stone-800">{o.customerSnapshot?.name || 'Customer'}</p>
-                      <p className="text-[10px] text-stone-400">{o.customerSnapshot?.email}</p>
-                    </td>
-                    <td className="py-3 font-bold text-stone-900">₹{o.grandTotal.toLocaleString('en-IN')}</td>
-                    <td className="py-3">
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${ORDER_STATUS_COLORS[o.status] || 'bg-stone-100'}`}>
-                        {ORDER_STATUS_LABELS[o.status] || o.status}
-                      </span>
-                    </td>
-                    <td className="py-3 uppercase text-[10px] font-bold text-emerald-700">
-                      {o.paymentStatus}
-                    </td>
-                    <td className="py-3 text-right">
-                      <Link
-                        href={`/admin/orders/${o._id}`}
-                        className="text-xs font-semibold text-[#681C2D] hover:underline"
-                      >
-                        Manage
-                      </Link>
+                {recentOrders.length > 0 ? (
+                  recentOrders.map((o: any) => (
+                    <tr key={o.id} className="hover:bg-[#FAF7F0] transition-colors">
+                      <td className="py-3 font-mono font-bold text-[#681C2D]">#{o.order_number}</td>
+                      <td className="py-3">
+                        <p className="font-semibold text-stone-800">{o.profiles?.name || (o.shipping_address as any)?.name || 'Customer'}</p>
+                        <p className="text-[10px] text-stone-400">{o.profiles?.phone || (o.shipping_address as any)?.phone || ''}</p>
+                      </td>
+                      <td className="py-3 font-bold text-stone-900">₹{Number(o.total_amount).toLocaleString('en-IN')}</td>
+                      <td className="py-3">
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${ORDER_STATUS_COLORS[o.status] || 'bg-stone-100'}`}>
+                          {ORDER_STATUS_LABELS[o.status] || o.status}
+                        </span>
+                      </td>
+                      <td className="py-3 uppercase text-[10px] font-bold text-emerald-700">
+                        {o.payment_status}
+                      </td>
+                      <td className="py-3 text-right">
+                        <Link
+                          href={`/admin/orders/${o.id}`}
+                          className="text-xs font-semibold text-[#681C2D] hover:underline"
+                        >
+                          Manage
+                        </Link>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={6} className="py-6 text-center text-stone-400">
+                      No orders yet. Orders placed by customers will appear here.
                     </td>
                   </tr>
-                ))}
+                )}
               </tbody>
             </table>
           </div>

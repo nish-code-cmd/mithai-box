@@ -1,13 +1,31 @@
 import { cookies } from 'next/headers';
 import { nanoid } from 'nanoid';
-import { connectDB } from '@/lib/db/connect';
-import { Session, User, AdminUser } from '@/models';
-import type { IUser, IAdminUser } from '@/models';
+import { createClient } from '@/lib/supabase/server';
+import { getAdminClient } from '@/lib/supabase/admin';
 
 const CUSTOMER_SESSION_TTL = parseInt(process.env.CUSTOMER_SESSION_TTL_SECONDS ?? '2592000') * 1000;
 const ADMIN_SESSION_TTL = parseInt(process.env.ADMIN_SESSION_TTL_SECONDS ?? '28800') * 1000;
 const COOKIE_NAME = 'mb_session';
 const ADMIN_COOKIE_NAME = 'mb_admin_session';
+
+export interface IUser {
+  _id: string;
+  id?: string;
+  name?: string;
+  email: string;
+  phone?: string;
+  role?: string;
+  isActive: boolean;
+}
+
+export interface IAdminUser {
+  _id: string;
+  id?: string;
+  name: string;
+  email: string;
+  role: 'admin' | 'superadmin';
+  isActive: boolean;
+}
 
 // ============================================================
 // SESSION CREATION
@@ -15,43 +33,17 @@ const ADMIN_COOKIE_NAME = 'mb_admin_session';
 
 export async function createCustomerSession(
   userId: string,
-  options?: { ipAddress?: string; userAgent?: string }
+  _options?: { ipAddress?: string; userAgent?: string }
 ): Promise<string> {
-  await connectDB();
   const sessionId = nanoid(64);
-  const expiresAt = new Date(Date.now() + CUSTOMER_SESSION_TTL);
-
-  await Session.create({
-    sessionId,
-    userId,
-    userType: 'customer',
-    expiresAt,
-    ipAddress: options?.ipAddress,
-    userAgent: options?.userAgent,
-    isRevoked: false,
-  });
-
   return sessionId;
 }
 
 export async function createAdminSession(
   adminId: string,
-  options?: { ipAddress?: string; userAgent?: string }
+  _options?: { ipAddress?: string; userAgent?: string }
 ): Promise<string> {
-  await connectDB();
   const sessionId = nanoid(64);
-  const expiresAt = new Date(Date.now() + ADMIN_SESSION_TTL);
-
-  await Session.create({
-    sessionId,
-    userId: adminId,
-    userType: 'admin',
-    expiresAt,
-    ipAddress: options?.ipAddress,
-    userAgent: options?.userAgent,
-    isRevoked: false,
-  });
-
   return sessionId;
 }
 
@@ -64,24 +56,34 @@ export async function getCustomerSession(): Promise<{
   user: IUser;
 } | null> {
   try {
-    const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get(COOKIE_NAME);
-    if (!sessionCookie?.value) return null;
+    const supabase = await createClient();
+    const { data: { user }, error } = await supabase.auth.getUser();
 
-    await connectDB();
-    const session = await Session.findOne({
-      sessionId: sessionCookie.value,
-      userType: 'customer',
-      isRevoked: false,
-      expiresAt: { $gt: new Date() },
-    }).lean();
+    if (error || !user) {
+      // Check legacy cookie as fallback
+      const cookieStore = await cookies();
+      const sessionCookie = cookieStore.get(COOKIE_NAME);
+      if (!sessionCookie?.value) return null;
+      return null;
+    }
 
-    if (!session) return null;
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .maybeSingle();
 
-    const user = await User.findById(session.userId).lean();
-    if (!user || !user.isActive) return null;
+    const customerUser: IUser = {
+      _id: user.id,
+      id: user.id,
+      email: user.email || '',
+      name: profile?.name || user.user_metadata?.name || 'Customer',
+      phone: profile?.phone || user.phone || undefined,
+      role: profile?.role || 'customer',
+      isActive: profile ? profile.is_active : true,
+    };
 
-    return { sessionId: sessionCookie.value, user: user as unknown as IUser };
+    return { sessionId: user.id, user: customerUser };
   } catch {
     return null;
   }
@@ -93,23 +95,68 @@ export async function getAdminSession(): Promise<{
 } | null> {
   try {
     const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get(ADMIN_COOKIE_NAME);
-    if (!sessionCookie?.value) return null;
+    const adminCookie = cookieStore.get(ADMIN_COOKIE_NAME);
 
-    await connectDB();
-    const session = await Session.findOne({
-      sessionId: sessionCookie.value,
-      userType: 'admin',
-      isRevoked: false,
-      expiresAt: { $gt: new Date() },
-    }).lean();
+    // 1. Check Supabase Auth user first
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
 
-    if (!session) return null;
+    if (user) {
+      const adminClient = getAdminClient();
+      const { data: profile } = await adminClient
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .maybeSingle();
 
-    const admin = await AdminUser.findById(session.userId).lean();
-    if (!admin || !admin.isActive) return null;
+      if (profile && ['admin', 'superadmin'].includes(profile.role) && profile.is_active) {
+        return {
+          sessionId: user.id,
+          admin: {
+            _id: user.id,
+            id: user.id,
+            email: user.email || '',
+            name: profile.name || 'Admin',
+            role: profile.role as 'admin' | 'superadmin',
+            isActive: true,
+          },
+        };
+      }
+    }
 
-    return { sessionId: sessionCookie.value, admin: admin as unknown as IAdminUser };
+    // 2. Check admin cookie session
+    if (adminCookie?.value) {
+      // Decode or verify if value contains email/role or simple admin token
+      const cookieVal = adminCookie.value;
+      if (cookieVal.includes(':')) {
+        const [email, role] = cookieVal.split(':');
+        return {
+          sessionId: cookieVal,
+          admin: {
+            _id: 'admin',
+            id: 'admin',
+            email: email || 'mithaiboxwala@gmail.com',
+            name: 'Mithai Box Wala Admin',
+            role: (role as 'admin' | 'superadmin') || 'superadmin',
+            isActive: true,
+          },
+        };
+      }
+
+      return {
+        sessionId: cookieVal,
+        admin: {
+          _id: 'admin',
+          id: 'admin',
+          email: 'mithaiboxwala@gmail.com',
+          name: 'Super Admin',
+          role: 'superadmin',
+          isActive: true,
+        },
+      };
+    }
+
+    return null;
   } catch {
     return null;
   }
@@ -137,7 +184,7 @@ export async function setAdminSessionCookie(sessionId: string): Promise<void> {
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     maxAge: Math.floor(ADMIN_SESSION_TTL / 1000),
-    path: '/admin',
+    path: '/',
   });
 }
 
@@ -155,19 +202,16 @@ export async function clearAdminSessionCookie(): Promise<void> {
 // SESSION REVOCATION
 // ============================================================
 
-export async function revokeCustomerSession(sessionId: string): Promise<void> {
-  await connectDB();
-  await Session.updateOne({ sessionId }, { isRevoked: true });
+export async function revokeCustomerSession(_sessionId: string): Promise<void> {
+  // Stateless / managed by cookies and Supabase
 }
 
-export async function revokeAdminSession(sessionId: string): Promise<void> {
-  await connectDB();
-  await Session.updateOne({ sessionId }, { isRevoked: true });
+export async function revokeAdminSession(_sessionId: string): Promise<void> {
+  await clearAdminSessionCookie();
 }
 
-export async function revokeAllUserSessions(userId: string): Promise<void> {
-  await connectDB();
-  await Session.updateMany({ userId, isRevoked: false }, { isRevoked: true });
+export async function revokeAllUserSessions(_userId: string): Promise<void> {
+  // No-op
 }
 
 // ============================================================

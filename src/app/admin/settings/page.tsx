@@ -1,8 +1,6 @@
 import React from 'react';
 import { redirect } from 'next/navigation';
 import { getAdminSession } from '@/lib/auth/session';
-import { connectDB } from '@/lib/db/connect';
-import { StoreSettings } from '@/models';
 import { BUSINESS } from '@/lib/constants';
 import { Building2, ShieldCheck, Truck, Mail, MapPin } from 'lucide-react';
 
@@ -13,7 +11,6 @@ export default async function AdminSettingsPage() {
   if (!session) {
     redirect('/admin/login');
   }
-  await connectDB();
 
   return (
     <div className="p-6 sm:p-10 space-y-8 max-w-5xl mx-auto w-full">

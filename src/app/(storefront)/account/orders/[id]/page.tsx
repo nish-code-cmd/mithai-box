@@ -2,9 +2,8 @@ import React from 'react';
 import { redirect, notFound } from 'next/navigation';
 import Link from 'next/link';
 import { getCustomerSession } from '@/lib/auth/session';
-import { connectDB } from '@/lib/db/connect';
-import { Order, Shipment } from '@/models';
-import { ArrowLeft, Truck, MapPin, Calendar, Clock, CheckCircle2 } from 'lucide-react';
+import { getAdminClient } from '@/lib/supabase/admin';
+import { ArrowLeft, MapPin, Calendar } from 'lucide-react';
 import { ORDER_STATUS_LABELS, ORDER_STATUS_COLORS, BUSINESS } from '@/lib/constants';
 
 export const dynamic = 'force-dynamic';
@@ -20,13 +19,21 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
     redirect(`/auth/login?returnUrl=/account/orders/${id}`);
   }
 
-  await connectDB();
-  const order = await Order.findOne({ _id: id, user: session.user._id }).lean();
-  if (!order) {
+  const admin = getAdminClient();
+  const { data: order, error } = await admin
+    .from('orders')
+    .select('*, order_items(*)')
+    .eq('id', id)
+    .eq('user_id', session.user.id || session.user._id)
+    .maybeSingle();
+
+  if (error || !order) {
     notFound();
   }
 
-  const shipment = await Shipment.findOne({ order: order._id }).lean();
+  const addr = typeof order.shipping_address === 'object' && order.shipping_address !== null
+    ? order.shipping_address as any
+    : {};
 
   return (
     <div className="bg-[#FAF7F0] min-h-screen py-10">
@@ -42,10 +49,10 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
               <span className="text-xs font-bold text-[#B8955A] uppercase tracking-wider">
                 Order Reference
               </span>
-              <h1 className="font-mono text-2xl font-bold text-[#681C2D]">#{order.orderNumber}</h1>
+              <h1 className="font-mono text-2xl font-bold text-[#681C2D]">#{order.order_number}</h1>
               <p className="text-xs text-stone-500 mt-1 flex items-center gap-1">
                 <Calendar size={13} />
-                Placed on {new Date(order.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                Placed on {new Date(order.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
               </p>
             </div>
 
@@ -54,40 +61,24 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
                 {ORDER_STATUS_LABELS[order.status] || order.status}
               </span>
               <span className="text-xs text-stone-500">
-                Payment: <strong className="text-emerald-700 uppercase">{order.paymentStatus}</strong>
+                Payment: <strong className="text-emerald-700 uppercase">{order.payment_status}</strong>
               </span>
             </div>
           </div>
-
-          {/* Shipment Tracking details if available */}
-          {shipment && (
-            <div className="my-6 p-4 bg-sky-50 border border-sky-200 rounded-xl flex items-start gap-3 text-xs text-sky-900">
-              <Truck size={18} className="text-sky-700 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="font-bold">Shipment Dispatched via {shipment.courier}</p>
-                <p className="font-mono mt-0.5">Tracking No: {shipment.trackingNumber}</p>
-                {shipment.trackingUrl && (
-                  <a href={shipment.trackingUrl} target="_blank" rel="noopener noreferrer" className="underline font-semibold mt-1 inline-block text-sky-800">
-                    Track Consignment Online →
-                  </a>
-                )}
-              </div>
-            </div>
-          )}
 
           {/* Items */}
           <div className="py-6 border-b border-[#EDE4D6]">
             <h2 className="font-display text-lg font-bold text-[#24211F] mb-4">Packaged Items</h2>
             <div className="divide-y divide-stone-100">
-              {order.items.map((item: any, idx: number) => (
+              {(order.order_items || []).map((item: any, idx: number) => (
                 <div key={idx} className="py-3 flex justify-between items-center text-xs">
                   <div>
-                    <p className="font-semibold text-stone-800">{item.snapshot.name}</p>
-                    <p className="text-stone-500">SKU: {item.snapshot.sku} • Qty: {item.quantity} pcs</p>
+                    <p className="font-semibold text-stone-800">{item.product_name}</p>
+                    <p className="text-stone-500">SKU: {item.product_sku || '—'} • Qty: {item.quantity} pcs</p>
                   </div>
                   <div className="text-right">
-                    <p className="font-bold text-[#681C2D]">₹{item.totalPrice.toLocaleString('en-IN')}</p>
-                    <p className="text-[11px] text-stone-400">₹{item.unitPrice}/pc</p>
+                    <p className="font-bold text-[#681C2D]">₹{Number(item.total_price).toLocaleString('en-IN')}</p>
+                    <p className="text-[11px] text-stone-400">₹{Number(item.unit_price)}/pc</p>
                   </div>
                 </div>
               ))}
@@ -98,21 +89,25 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
           <div className="py-6 border-b border-[#EDE4D6] space-y-2 text-xs text-stone-600">
             <div className="flex justify-between">
               <span>Subtotal</span>
-              <span className="font-semibold text-stone-800">₹{order.subtotal.toLocaleString('en-IN')}</span>
+              <span className="font-semibold text-stone-800">₹{Number(order.subtotal).toLocaleString('en-IN')}</span>
             </div>
-            {order.discountAmount > 0 && (
+            {order.discount_amount > 0 && (
               <div className="flex justify-between text-emerald-700">
-                <span>Discount ({order.couponCode})</span>
-                <span>-₹{order.discountAmount.toLocaleString('en-IN')}</span>
+                <span>Discount ({order.coupon_code})</span>
+                <span>-₹{Number(order.discount_amount).toLocaleString('en-IN')}</span>
               </div>
             )}
             <div className="flex justify-between">
               <span>Shipping & Packaging</span>
-              <span className="font-semibold text-stone-800">₹{order.shippingTotal.toLocaleString('en-IN')}</span>
+              <span className="font-semibold text-stone-800">₹{Number(order.shipping_charge).toLocaleString('en-IN')}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>GST (12% packaging)</span>
+              <span className="font-semibold text-stone-800">₹{Number(order.gst_amount).toLocaleString('en-IN')}</span>
             </div>
             <div className="pt-2 flex justify-between text-sm font-bold text-[#24211F]">
-              <span>Grand Total (Advance Paid)</span>
-              <span className="font-display text-xl text-[#681C2D]">₹{order.grandTotal.toLocaleString('en-IN')}</span>
+              <span>Grand Total</span>
+              <span className="font-display text-xl text-[#681C2D]">₹{Number(order.total_amount).toLocaleString('en-IN')}</span>
             </div>
           </div>
 
@@ -122,11 +117,11 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
               <h3 className="font-semibold text-stone-800 mb-1 flex items-center gap-1.5">
                 <MapPin size={14} className="text-[#681C2D]" /> Shipping Destination
               </h3>
-              <p className="font-medium text-stone-700">{order.shippingAddressSnapshot.fullName}</p>
-              <p>{order.shippingAddressSnapshot.addressLine1}</p>
-              {order.shippingAddressSnapshot.addressLine2 && <p>{order.shippingAddressSnapshot.addressLine2}</p>}
-              <p>{order.shippingAddressSnapshot.city}, {order.shippingAddressSnapshot.state} – {order.shippingAddressSnapshot.pincode}</p>
-              <p className="mt-1">Phone: {order.shippingAddressSnapshot.phone}</p>
+              <p className="font-medium text-stone-700">{addr.fullName || addr.name || 'Customer'}</p>
+              <p>{addr.addressLine1 || addr.line1 || ''}</p>
+              {addr.line2 && <p>{addr.line2}</p>}
+              <p>{addr.city || ''}, {addr.state || ''} – {addr.pincode || ''}</p>
+              <p className="mt-1">Phone: {addr.phone || ''}</p>
             </div>
 
             <div className="bg-[#FAF7F0] p-4 rounded-xl border border-[#EDE4D6]">

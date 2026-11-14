@@ -126,19 +126,24 @@ export function Header() {
             >
               <div
                 style={{
-                  width: 44,
-                  height: 44,
+                  width: 48,
+                  height: 48,
                   borderRadius: 12,
                   flexShrink: 0,
-                  background: 'linear-gradient(135deg, #4A1420 0%, #681C2D 60%, #8B2B3F 100%)',
+                  overflow: 'hidden',
+                  background: '#681C2D',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   boxShadow: '0 4px 14px rgba(104,28,45,0.28)',
-                  border: '1px solid rgba(184,149,90,0.4)',
+                  border: '1.5px solid rgba(184,149,90,0.5)',
                 }}
               >
-                <Package size={22} color="#B8955A" />
+                <img
+                  src="/images/editorial/Gemini_Generated_Image_3w4lsp3w4lsp3w4l.png"
+                  alt="Mithai Box Wala Official Logo"
+                  style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                />
               </div>
               <div>
                 <div

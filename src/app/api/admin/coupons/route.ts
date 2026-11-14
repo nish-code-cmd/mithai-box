@@ -1,58 +1,56 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { connectDB } from '@/lib/db/connect';
-import { Coupon, AuditLog } from '@/models';
+import { getAdminClient } from '@/lib/supabase/admin';
 import { requireAdminAuth } from '@/lib/auth/session';
-import { CreateCouponSchema } from '@/lib/validation/schemas';
 
 export async function GET() {
   try {
-    await requireAdminAuth(['super_admin', 'marketing_manager']);
-    await connectDB();
-    const coupons = await Coupon.find().sort({ createdAt: -1 }).lean();
-    return NextResponse.json({ success: true, data: coupons });
+    await requireAdminAuth();
+    const admin = getAdminClient();
+    const { data: coupons, error } = await admin
+      .from('coupons')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true, data: coupons || [] });
   } catch (err: any) {
-    if (err.message === 'UNAUTHORIZED') return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
-    if (err.message === 'FORBIDDEN') return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+    return NextResponse.json({ success: false, error: err.message || 'Unauthorized' }, { status: 401 });
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await requireAdminAuth(['super_admin', 'marketing_manager']);
+    await requireAdminAuth();
     const body = await request.json();
-    const parsed = CreateCouponSchema.safeParse(body);
-    if (!parsed.success) {
-      return NextResponse.json({ success: false, error: 'Validation failed', details: parsed.error.format() }, { status: 400 });
+    const { code, discount_type, type, discount_value, value, min_order_amount, minOrderAmount } = body;
+
+    const couponCode = (code || '').toUpperCase().trim();
+    if (!couponCode) {
+      return NextResponse.json({ success: false, error: 'Coupon code is required' }, { status: 400 });
     }
 
-    await connectDB();
+    const admin = getAdminClient();
+    const { data: coupon, error } = await admin
+      .from('coupons')
+      .insert({
+        code: couponCode,
+        discount_type: (discount_type || type || 'percent') === 'percentage' ? 'percent' : 'percent',
+        discount_value: Number(discount_value || value || 10),
+        min_order_amount: min_order_amount || minOrderAmount || null,
+        is_active: true,
+      })
+      .select()
+      .single();
 
-    const existing = await Coupon.findOne({ code: parsed.data.code.toUpperCase() });
-    if (existing) {
-      return NextResponse.json({ success: false, error: 'Coupon code already exists' }, { status: 400 });
+    if (error) {
+      return NextResponse.json({ success: false, error: error.message }, { status: 400 });
     }
-
-    const coupon = await Coupon.create({
-      ...parsed.data,
-      code: parsed.data.code.toUpperCase(),
-      startsAt: parsed.data.startsAt ? new Date(parsed.data.startsAt) : undefined,
-      expiresAt: parsed.data.expiresAt ? new Date(parsed.data.expiresAt) : undefined,
-    });
-
-    await AuditLog.create({
-      adminId: session.admin._id,
-      adminEmail: session.admin.email,
-      action: 'create_coupon',
-      resourceType: 'Coupon',
-      resourceId: coupon._id.toString(),
-      changes: parsed.data,
-    });
 
     return NextResponse.json({ success: true, data: coupon }, { status: 201 });
   } catch (err: any) {
-    if (err.message === 'UNAUTHORIZED') return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
-    if (err.message === 'FORBIDDEN') return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+    return NextResponse.json({ success: false, error: err.message || 'Internal server error' }, { status: 500 });
   }
 }

@@ -1,9 +1,8 @@
 import React from 'react';
 import Link from 'next/link';
-import { connectDB } from '@/lib/db/connect';
-import { Product, Category } from '@/models';
+import { createClient } from '@/lib/supabase/server';
 import { ProductCard } from '@/components/product/ProductCard';
-import { Filter, ChevronRight, SlidersHorizontal } from 'lucide-react';
+import { ChevronRight, SlidersHorizontal } from 'lucide-react';
 import { CATEGORIES } from '@/lib/constants';
 
 interface ProductsPageProps {
@@ -22,39 +21,48 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
   const page = Math.max(1, parseInt(params.page || '1', 10));
   const search = params.search;
   const limit = 16;
-  const skip = (page - 1) * limit;
+  const offset = (page - 1) * limit;
 
-  await connectDB();
+  const supabase = await createClient();
 
-  let query: any = { isActive: true };
-
-  let currentCategory = null;
+  let currentCategory: { id: string; name: string; slug: string; description: string | null } | null = null;
   if (categorySlug) {
-    currentCategory = await Category.findOne({ slug: categorySlug }).lean();
-    if (currentCategory) {
-      query.category = currentCategory._id;
-    }
+    const { data: cat } = await supabase
+      .from('categories')
+      .select('id, name, slug, description')
+      .eq('slug', categorySlug)
+      .maybeSingle();
+    currentCategory = cat;
+  }
+
+  // Base query
+  let query = supabase
+    .from('products')
+    .select('*, categories(id, name, slug)', { count: 'exact' })
+    .eq('is_active', true);
+
+  if (currentCategory) {
+    query = query.eq('category_id', currentCategory.id);
   }
 
   if (search) {
-    query.$text = { $search: search };
+    query = query.or(`name.ilike.%${search}%,description.ilike.%${search}%`);
   }
 
-  let sortQuery: any = { createdAt: -1 };
-  if (sort === 'price_asc') sortQuery = { basePrice: 1 };
-  if (sort === 'price_desc') sortQuery = { basePrice: -1 };
-  if (sort === 'popular') sortQuery = { totalSold: -1 };
+  // Sorting
+  if (sort === 'price_asc') {
+    query = query.order('base_price', { ascending: true });
+  } else if (sort === 'price_desc') {
+    query = query.order('base_price', { ascending: false });
+  } else {
+    query = query.order('created_at', { ascending: false });
+  }
 
-  const [products, total] = await Promise.all([
-    Product.find(query)
-      .sort(sortQuery)
-      .skip(skip)
-      .limit(limit)
-      .populate('category', 'name slug')
-      .lean(),
-    Product.countDocuments(query),
-  ]);
+  query = query.range(offset, offset + limit - 1);
 
+  const { data: productsData, count } = await query;
+  const products = productsData || [];
+  const total = count || 0;
   const totalPages = Math.ceil(total / limit);
 
   return (
@@ -65,14 +73,14 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
           <Link href="/" className="hover:text-[#681C2D]">Home</Link>
           <ChevronRight size={12} />
           <span className="text-[#24211F] font-medium">
-            {currentCategory ? (currentCategory as any).name : 'All Packaging'}
+            {currentCategory ? currentCategory.name : 'All Packaging'}
           </span>
         </nav>
 
         {/* Header */}
         <div className="mb-8">
           <h1 className="font-display text-3xl sm:text-4xl font-bold text-[#681C2D]">
-            {currentCategory ? (currentCategory as any).name : 'Packaging Catalog'}
+            {currentCategory ? currentCategory.name : 'Packaging Catalog'}
           </h1>
           <p className="text-sm text-stone-600 mt-1">
             {currentCategory?.description || 'Browse our complete range of premium mithai boxes, sweet packaging, dry fruit containers, and festive hampers.'}
@@ -161,7 +169,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
             {products.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
                 {products.map((product: any) => (
-                  <ProductCard key={product._id} product={JSON.parse(JSON.stringify(product))} />
+                  <ProductCard key={product.id} product={product} />
                 ))}
               </div>
             ) : (

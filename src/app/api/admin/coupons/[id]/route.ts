@@ -1,66 +1,56 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { connectDB } from '@/lib/db/connect';
-import { Coupon, AuditLog } from '@/models';
+import { getAdminClient } from '@/lib/supabase/admin';
 import { requireAdminAuth } from '@/lib/auth/session';
+
+type Params = { params: Promise<{ id: string }> };
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: Params
 ) {
   try {
-    const session = await requireAdminAuth(['super_admin', 'marketing_manager']);
+    await requireAdminAuth();
     const { id } = await params;
     const body = await request.json();
 
-    await connectDB();
-    const coupon = await Coupon.findByIdAndUpdate(id, body, { new: true });
-    if (!coupon) {
-      return NextResponse.json({ success: false, error: 'Coupon not found' }, { status: 404 });
-    }
+    const admin = getAdminClient();
+    const { data: coupon, error } = await admin
+      .from('coupons')
+      .update(body)
+      .eq('id', id)
+      .select()
+      .single();
 
-    await AuditLog.create({
-      adminId: session.admin._id,
-      adminEmail: session.admin.email,
-      action: 'update_coupon',
-      resourceType: 'Coupon',
-      resourceId: coupon._id.toString(),
-      changes: body,
-    });
+    if (error || !coupon) {
+      return NextResponse.json({ success: false, error: 'Coupon not found or update failed' }, { status: 400 });
+    }
 
     return NextResponse.json({ success: true, data: coupon });
   } catch (err: any) {
-    if (err.message === 'UNAUTHORIZED') return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
-    if (err.message === 'FORBIDDEN') return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+    return NextResponse.json({ success: false, error: err.message || 'Unauthorized' }, { status: 401 });
   }
 }
 
 export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  _request: NextRequest,
+  { params }: Params
 ) {
   try {
-    const session = await requireAdminAuth(['super_admin', 'marketing_manager']);
+    await requireAdminAuth();
     const { id } = await params;
+    const admin = getAdminClient();
 
-    await connectDB();
-    const coupon = await Coupon.findByIdAndUpdate(id, { isActive: false }, { new: true });
-    if (!coupon) {
-      return NextResponse.json({ success: false, error: 'Coupon not found' }, { status: 404 });
+    const { error } = await admin
+      .from('coupons')
+      .update({ is_active: false })
+      .eq('id', id);
+
+    if (error) {
+      return NextResponse.json({ success: false, error: error.message }, { status: 400 });
     }
-
-    await AuditLog.create({
-      adminId: session.admin._id,
-      adminEmail: session.admin.email,
-      action: 'deactivate_coupon',
-      resourceType: 'Coupon',
-      resourceId: coupon._id.toString(),
-    });
 
     return NextResponse.json({ success: true, message: 'Coupon deactivated successfully' });
   } catch (err: any) {
-    if (err.message === 'UNAUTHORIZED') return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
-    if (err.message === 'FORBIDDEN') return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+    return NextResponse.json({ success: false, error: err.message || 'Unauthorized' }, { status: 401 });
   }
 }

@@ -1,45 +1,44 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { connectDB } from '@/lib/db/connect';
-import { WholesaleEnquiry } from '@/models';
+import { getAdminClient } from '@/lib/supabase/admin';
 import { requireAdminAuth } from '@/lib/auth/session';
 
 export async function GET(request: NextRequest) {
   try {
-    await requireAdminAuth(['super_admin', 'order_manager', 'customer_support']);
-    await connectDB();
-
+    await requireAdminAuth();
     const { searchParams } = new URL(request.url);
     const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
     const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '20', 10)));
+    const offset = (page - 1) * limit;
     const status = searchParams.get('status');
 
-    const query: any = {};
-    if (status) query.status = status;
+    const admin = getAdminClient();
+    let query = admin
+      .from('wholesale_enquiries')
+      .select('*', { count: 'exact' })
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
 
-    const skip = (page - 1) * limit;
-    const [enquiries, total] = await Promise.all([
-      WholesaleEnquiry.find(query)
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit)
-        .populate('assignedTo', 'name email')
-        .lean(),
-      WholesaleEnquiry.countDocuments(query),
-    ]);
+    if (status) {
+      query = query.eq('status', status as any);
+    }
+
+    const { data: enquiries, count, error } = await query;
+
+    if (error) {
+      return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    }
 
     return NextResponse.json({
       success: true,
       data: {
-        items: enquiries,
-        total,
+        items: enquiries || [],
+        total: count || 0,
         page,
         limit,
-        totalPages: Math.ceil(total / limit),
+        totalPages: Math.ceil((count || 0) / limit),
       },
     });
   } catch (err: any) {
-    if (err.message === 'UNAUTHORIZED') return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
-    if (err.message === 'FORBIDDEN') return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+    return NextResponse.json({ success: false, error: err.message || 'Unauthorized' }, { status: 401 });
   }
 }

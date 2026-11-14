@@ -6,17 +6,22 @@ import {
 } from 'lucide-react';
 import { BUSINESS, COPY, CATEGORIES, FESTIVALS } from '@/lib/constants';
 import { ProductCard } from '@/components/product/ProductCard';
-import { connectDB } from '@/lib/db/connect';
-import { Product } from '@/models';
+import { createClient } from '@/lib/supabase/server';
 
 async function getFeaturedProducts() {
   try {
-    await connectDB();
-    const products = await Product.find({ isActive: true, isFeatured: true })
-      .populate('category', 'name slug')
-      .limit(8)
-      .lean();
-    return JSON.parse(JSON.stringify(products));
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from('products')
+      .select('*, categories(name, slug)')
+      .eq('is_active', true)
+      .eq('is_featured', true)
+      .limit(8);
+
+    if (error || !data) {
+      return [];
+    }
+    return data;
   } catch {
     return [];
   }
@@ -174,6 +179,21 @@ export default async function HomePage() {
                       Festive & Luxury<br />Sweet Packaging
                     </h3>
                   </div>
+
+                  {/* Secondary Visual Reference Asset */}
+                  <div className="relative aspect-[16/10] rounded-2xl overflow-hidden border border-[#EDE4D6] shadow-sm group">
+                    <img
+                      src="/images/editorial/Gemini_Generated_Image_jbsl4ljbsl4ljbsl.png"
+                      alt="Mithai Box Wala Premium Packaging Collection"
+                      className="w-full h-full object-cover object-center transition-transform duration-700 group-hover:scale-105"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent flex items-end p-3">
+                      <span className="text-[11px] font-semibold text-[#FAF7F0] drop-shadow">
+                        Signature Festive Collection · Ajay Packers
+                      </span>
+                    </div>
+                  </div>
+
                   <p className="text-sm leading-relaxed" style={{ color: '#5C5855' }}>
                     Trusted by halwais, sweet houses, gourmet confectioners,
                     and corporate gifting specialists across India.
@@ -318,7 +338,7 @@ export default async function HomePage() {
           {featuredProducts.length > 0 ? (
             <div className="product-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
               {featuredProducts.map((p: any, i: number) => (
-                <ProductCard key={p._id} product={p} animationDelay={i * 80} />
+                <ProductCard key={p.id || p._id} product={p} animationDelay={i * 80} />
               ))}
             </div>
           ) : (

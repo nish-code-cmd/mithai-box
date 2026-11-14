@@ -1,69 +1,40 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { nanoid } from 'nanoid';
-import { connectDB } from '@/lib/db/connect';
-import { Product } from '@/models';
+import { getAdminClient } from '@/lib/supabase/admin';
 
-const MAX_SUGGESTIONS = 8;
-
-// ============================================================
-// GET /api/search?q=query&limit=8 — Search suggestions
-// ============================================================
 export async function GET(request: NextRequest) {
-  const requestId = nanoid(10);
-
   try {
     const { searchParams } = new URL(request.url);
     const q = searchParams.get('q')?.trim() ?? '';
-    const limitParam = Math.min(parseInt(searchParams.get('limit') ?? '8', 10), MAX_SUGGESTIONS);
-    const limit = isNaN(limitParam) ? MAX_SUGGESTIONS : limitParam;
+    const limit = Math.min(parseInt(searchParams.get('limit') ?? '8', 10), 20);
 
     if (!q || q.length < 2) {
-      return NextResponse.json(
-        { success: true, data: { suggestions: [] } },
-        { status: 200 }
-      );
+      return NextResponse.json({ success: true, data: { suggestions: [] } }, { status: 200 });
     }
 
-    if (q.length > 200) {
-      return NextResponse.json(
-        { success: false, error: 'query_too_long', message: 'Search query is too long.', requestId },
-        { status: 400 }
-      );
-    }
+    const admin = getAdminClient();
+    const { data: products } = await admin
+      .from('products')
+      .select('name, slug, images, base_price, wholesale_price')
+      .eq('is_active', true)
+      .or(`name.ilike.%${q}%,description.ilike.%${q}%,sku.ilike.%${q}%`)
+      .limit(limit);
 
-    await connectDB();
+    const suggestions = (products || []).map((p: any) => {
+      const firstImg = Array.isArray(p.images) && p.images.length > 0 ? p.images[0] : null;
+      return {
+        name: p.name,
+        slug: p.slug,
+        imageUrl: typeof firstImg === 'string' ? firstImg : firstImg?.url ?? null,
+        price: p.wholesale_price ?? p.base_price,
+      };
+    });
 
-    const products = await Product.find(
-      {
-        $text: { $search: q },
-        isActive: true,
-      },
-      { score: { $meta: 'textScore' } }
-    )
-      .select('name slug images basePrice salePrice')
-      .sort({ score: { $meta: 'textScore' } })
-      .limit(limit)
-      .lean();
-
-    return NextResponse.json(
-      {
-        success: true,
-        data: {
-          suggestions: products.map((p) => ({
-            name: p.name,
-            slug: p.slug,
-            imageUrl: p.images?.[0]?.url ?? null,
-            price: p.salePrice ?? p.basePrice,
-          })),
-        },
-      },
-      { status: 200 }
-    );
+    return NextResponse.json({
+      success: true,
+      data: { suggestions },
+    });
   } catch (err) {
-    console.error('[GET /api/search] Unexpected error:', err);
-    return NextResponse.json(
-      { success: false, error: 'internal_error', message: 'An unexpected error occurred.', requestId },
-      { status: 500 }
-    );
+    console.error('[GET /api/search] Error:', err);
+    return NextResponse.json({ success: false, error: 'Internal server error' }, { status: 500 });
   }
 }

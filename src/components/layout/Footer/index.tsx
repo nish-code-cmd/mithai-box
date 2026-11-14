@@ -162,19 +162,24 @@ export function Footer() {
           {/* Brand Column */}
           <div style={{ gridColumn: 'span 1' }}>
             {/* Logo */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
               <div style={{
-                width: 42,
-                height: 42,
+                width: 44,
+                height: 44,
                 borderRadius: 10,
-                background: 'linear-gradient(135deg,#681C2D,#8B2B3F)',
+                overflow: 'hidden',
+                background: '#681C2D',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: 20,
                 flexShrink: 0,
+                border: '1px solid rgba(184,149,90,0.4)',
               }}>
-                📦
+                <img
+                  src="/images/editorial/Gemini_Generated_Image_3w4lsp3w4lsp3w4l.png"
+                  alt="Mithai Box Wala Official Logo"
+                  style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                />
               </div>
               <div>
                 <div style={{

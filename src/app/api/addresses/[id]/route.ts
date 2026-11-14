@@ -1,162 +1,80 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { nanoid } from 'nanoid';
-import { connectDB } from '@/lib/db/connect';
-import { requireCustomerAuth } from '@/lib/auth/session';
-import { Address } from '@/models';
-import { AddressSchema } from '@/lib/validation/schemas';
-import mongoose from 'mongoose';
+import { createClient } from '@/lib/supabase/server';
+import { getAdminClient } from '@/lib/supabase/admin';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
 }
 
-// ============================================================
-// PUT /api/addresses/[id] — Update an address (verify ownership)
-// ============================================================
 export async function PUT(request: NextRequest, { params }: RouteParams) {
-  const requestId = nanoid(10);
-
   try {
-    const session = await requireCustomerAuth().catch(() => null);
-    if (!session) {
-      return NextResponse.json(
-        { success: false, error: 'unauthorized', message: 'Authentication required.', requestId },
-        { status: 401 }
-      );
-    }
-
     const { id } = await params;
-    if (!mongoose.isValidObjectId(id)) {
-      return NextResponse.json(
-        { success: false, error: 'invalid_id', message: 'Invalid address ID.', requestId },
-        { status: 400 }
-      );
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
     }
 
-    const body = await request.json().catch(() => null);
-    if (!body) {
-      return NextResponse.json(
-        { success: false, error: 'invalid_body', message: 'Invalid JSON body.', requestId },
-        { status: 400 }
-      );
+    const body = await request.json();
+    const { fullName, name, phone, addressLine1, line1, addressLine2, line2, city, state, pincode, isDefault } = body;
+
+    const admin = getAdminClient();
+
+    if (isDefault) {
+      await admin.from('addresses').update({ is_default: false }).eq('user_id', user.id);
     }
 
-    const parsed = AddressSchema.safeParse(body);
-    if (!parsed.success) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'validation_failed',
-          details: parsed.error.flatten().fieldErrors,
-          requestId,
-        },
-        { status: 422 }
-      );
+    const { data: updated, error } = await admin
+      .from('addresses')
+      .update({
+        name: fullName || name,
+        phone,
+        line1: addressLine1 || line1,
+        line2: addressLine2 || line2,
+        city,
+        state,
+        pincode,
+        is_default: !!isDefault,
+      })
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .select()
+      .single();
+
+    if (error || !updated) {
+      return NextResponse.json({ success: false, error: 'Address not found or update failed' }, { status: 400 });
     }
 
-    await connectDB();
-    const userId = session.user._id as mongoose.Types.ObjectId;
-
-    // Ownership check — both _id AND user must match
-    const existing = await Address.findOne({ _id: id, user: userId });
-    if (!existing) {
-      return NextResponse.json(
-        { success: false, error: 'not_found', message: 'Address not found.', requestId },
-        { status: 404 }
-      );
-    }
-
-    // If setting as default, clear all other defaults for this user first
-    if (parsed.data.isDefault) {
-      await Address.updateMany(
-        { user: userId, _id: { $ne: id } },
-        { $set: { isDefault: false } }
-      );
-    }
-
-    const updated = await Address.findOneAndUpdate(
-      { _id: id, user: userId },
-      { $set: parsed.data },
-      { new: true, runValidators: true }
-    ).lean();
-
-    if (!updated) {
-      return NextResponse.json(
-        { success: false, error: 'not_found', message: 'Address not found.', requestId },
-        { status: 404 }
-      );
-    }
-
-    return NextResponse.json(
-      {
-        success: true,
-        data: {
-          id: updated._id.toString(),
-          label: updated.label ?? null,
-          fullName: updated.fullName,
-          phone: updated.phone,
-          addressLine1: updated.addressLine1,
-          addressLine2: updated.addressLine2 ?? null,
-          city: updated.city,
-          state: updated.state,
-          pincode: updated.pincode,
-          country: updated.country,
-          isDefault: updated.isDefault,
-        },
-      },
-      { status: 200 }
-    );
-  } catch (err) {
-    console.error('[PUT /api/addresses/[id]] Unexpected error:', err);
-    return NextResponse.json(
-      { success: false, error: 'internal_error', message: 'An unexpected error occurred.', requestId },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: true, data: updated });
+  } catch (err: any) {
+    return NextResponse.json({ success: false, error: err.message || 'Internal server error' }, { status: 500 });
   }
 }
 
-// ============================================================
-// DELETE /api/addresses/[id] — Delete an address (verify ownership)
-// ============================================================
-export async function DELETE(request: NextRequest, { params }: RouteParams) {
-  const requestId = nanoid(10);
-
+export async function DELETE(_request: NextRequest, { params }: RouteParams) {
   try {
-    const session = await requireCustomerAuth().catch(() => null);
-    if (!session) {
-      return NextResponse.json(
-        { success: false, error: 'unauthorized', message: 'Authentication required.', requestId },
-        { status: 401 }
-      );
-    }
-
     const { id } = await params;
-    if (!mongoose.isValidObjectId(id)) {
-      return NextResponse.json(
-        { success: false, error: 'invalid_id', message: 'Invalid address ID.', requestId },
-        { status: 400 }
-      );
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
     }
 
-    await connectDB();
-    const userId = session.user._id as mongoose.Types.ObjectId;
+    const admin = getAdminClient();
+    const { error } = await admin
+      .from('addresses')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', user.id);
 
-    // Ownership check — only delete if user owns the address
-    const result = await Address.findOneAndDelete({ _id: id, user: userId });
-
-    if (!result) {
-      return NextResponse.json(
-        { success: false, error: 'not_found', message: 'Address not found.', requestId },
-        { status: 404 }
-      );
+    if (error) {
+      return NextResponse.json({ success: false, error: 'Failed to delete address' }, { status: 400 });
     }
 
-    return NextResponse.json({ success: true }, { status: 200 });
-  } catch (err) {
-    console.error('[DELETE /api/addresses/[id]] Unexpected error:', err);
-    return NextResponse.json(
-      { success: false, error: 'internal_error', message: 'An unexpected error occurred.', requestId },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: true });
+  } catch (err: any) {
+    return NextResponse.json({ success: false, error: err.message || 'Internal server error' }, { status: 500 });
   }
 }

@@ -5,20 +5,28 @@ import Link from 'next/link';
 import { Heart, ShoppingBag, Eye, Package, Star } from 'lucide-react';
 import { useCartStore } from '@/features/cart/store';
 
-interface ProductCardProps {
+export interface ProductCardProps {
   product: {
-    _id: string;
+    _id?: string;
+    id?: string;
     name: string;
     slug: string;
-    sku: string;
-    basePrice: number;
+    sku?: string;
+    basePrice?: number;
+    base_price?: number;
     salePrice?: number;
-    moq: number;
+    mrp?: number;
+    wholesale_price?: number;
+    moq?: number;
+    min_order_qty?: number;
     unit?: string;
-    images?: { url: string; altText?: string }[];
+    images?: (string | { url: string; altText?: string })[];
     category?: { name: string; slug: string } | any;
+    categories?: { name: string; slug: string } | any;
     isCustomizable?: boolean;
     isFeatured?: boolean;
+    is_featured?: boolean;
+    is_bestseller?: boolean;
   };
   animationDelay?: number;
 }
@@ -28,21 +36,44 @@ export function ProductCard({ product, animationDelay = 0 }: ProductCardProps) {
   const [wishlisted, setWishlisted] = useState(false);
   const [addingToCart, setAddingToCart] = useState(false);
 
+  const productId = product.id || product._id || '';
+  const basePrice = Number(product.basePrice ?? product.base_price ?? 0);
+  const salePrice = product.salePrice ?? product.wholesale_price;
+  const moq = Number(product.moq ?? product.min_order_qty ?? 1);
+  const isFeatured = Boolean(product.isFeatured ?? product.is_featured);
+
+  // Extract first image url
+  let mainImage: string | undefined;
+  let altText = product.name;
+  if (Array.isArray(product.images) && product.images.length > 0) {
+    const firstImg = product.images[0];
+    if (typeof firstImg === 'string') {
+      mainImage = firstImg;
+    } else if (firstImg && typeof firstImg === 'object') {
+      mainImage = firstImg.url;
+      altText = firstImg.altText || product.name;
+    }
+  }
+
+  const categoryObj = product.category || product.categories;
+  const categoryName = typeof categoryObj === 'object' ? categoryObj?.name : undefined;
+
+  const price = salePrice ?? basePrice;
+
   const handleAddToCart = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setAddingToCart(true);
-    const price = product.salePrice ?? product.basePrice;
     addItem({
-      productId: product._id,
+      productId,
       name: product.name,
-      sku: product.sku,
+      sku: product.sku || '',
       slug: product.slug,
-      imageUrl: product.images?.[0]?.url,
-      quantity: product.moq || 1,
+      imageUrl: mainImage,
+      quantity: moq,
       unitPrice: price,
-      totalPrice: price * (product.moq || 1),
-      moq: product.moq || 1,
+      totalPrice: price * moq,
+      moq,
     });
     setTimeout(() => setAddingToCart(false), 900);
   };
@@ -55,15 +86,14 @@ export function ProductCard({ product, animationDelay = 0 }: ProductCardProps) {
       await fetch('/api/wishlist', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ productId: product._id }),
+        body: JSON.stringify({ productId }),
       });
     } catch { /* noop */ }
   };
 
-  const mainImage = product.images?.[0]?.url;
   const discountPct =
-    product.salePrice && product.salePrice < product.basePrice
-      ? Math.round(((product.basePrice - product.salePrice) / product.basePrice) * 100)
+    salePrice && salePrice < basePrice
+      ? Math.round(((basePrice - salePrice) / basePrice) * 100)
       : null;
 
   return (
@@ -78,7 +108,7 @@ export function ProductCard({ product, animationDelay = 0 }: ProductCardProps) {
         {mainImage ? (
           <img
             src={mainImage}
-            alt={product.images?.[0]?.altText ?? product.name}
+            alt={altText}
             className="w-full h-full object-cover object-center transition-transform duration-700 group-hover:scale-105"
             style={{ transition: 'transform 0.6s cubic-bezier(0.22,1,0.36,1)' }}
           />
@@ -100,7 +130,7 @@ export function ProductCard({ product, animationDelay = 0 }: ProductCardProps) {
 
         {/* Badges */}
         <div className="absolute top-3 left-3 flex flex-col gap-1.5">
-          {product.isFeatured && (
+          {isFeatured && (
             <span
               className="flex items-center gap-1 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm"
               style={{ background: 'linear-gradient(90deg,#681C2D,#8B2B3F)' }}
@@ -151,9 +181,9 @@ export function ProductCard({ product, animationDelay = 0 }: ProductCardProps) {
       {/* ── Details ── */}
       <div className="p-4 sm:p-5 flex-1 flex flex-col justify-between">
         <div>
-          {product.category?.name && (
+          {categoryName && (
             <p className="text-[10px] font-bold tracking-widest text-[#B8955A] uppercase mb-1">
-              {product.category.name}
+              {categoryName}
             </p>
           )}
           <Link href={`/products/${product.slug}`}>
@@ -167,7 +197,7 @@ export function ProductCard({ product, animationDelay = 0 }: ProductCardProps) {
             </h3>
           </Link>
           <p className="text-[11px] text-stone-400 mt-1 font-medium">
-            MOQ: {product.moq} {product.unit || 'pcs'}
+            MOQ: {moq} {product.unit || 'pcs'}
           </p>
         </div>
 
@@ -176,11 +206,11 @@ export function ProductCard({ product, animationDelay = 0 }: ProductCardProps) {
           <div>
             <div className="flex items-baseline gap-1.5">
               <span className="text-base font-bold" style={{ color: '#681C2D' }}>
-                ₹{(product.salePrice ?? product.basePrice).toLocaleString('en-IN')}
+                ₹{price.toLocaleString('en-IN')}
               </span>
-              {product.salePrice && product.salePrice < product.basePrice && (
+              {salePrice && salePrice < basePrice && (
                 <span className="text-xs text-stone-400 line-through">
-                  ₹{product.basePrice.toLocaleString('en-IN')}
+                  ₹{basePrice.toLocaleString('en-IN')}
                 </span>
               )}
             </div>

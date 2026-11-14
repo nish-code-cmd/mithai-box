@@ -18,14 +18,25 @@ export function ProductDetailClient({ product, inventory }: ProductDetailClientP
   const router = useRouter();
   const { addItem } = useCartStore();
 
+  const productId = product.id || product._id;
+  const basePrice = Number(product.basePrice ?? product.base_price ?? 0);
+  const salePrice = product.salePrice ?? product.wholesale_price;
+  const moq = Number(product.moq ?? product.min_order_qty ?? 1);
+  const stock = product.stock ?? inventory?.quantity ?? 100;
+
+  const rawImages = Array.isArray(product.images) && product.images.length > 0 ? product.images : [];
+  const images = rawImages.length > 0
+    ? rawImages.map((img: any) => typeof img === 'string' ? { url: img, altText: product.name } : img)
+    : [{ url: '', altText: product.name }];
+
   const [selectedImage, setSelectedImage] = useState(0);
-  const [quantity, setQuantity] = useState(product.moq || 1);
+  const [quantity, setQuantity] = useState(moq);
   const [activeTab, setActiveTab] = useState<'specs' | 'pricing' | 'shipping'>('specs');
   const [copied, setCopied] = useState(false);
 
   // Calculate tier price if applicable
   const getUnitPrice = (qty: number) => {
-    let effective = product.salePrice ?? product.basePrice;
+    let effective = salePrice ?? basePrice;
     if (product.bulkPricingTiers && product.bulkPricingTiers.length > 0) {
       const applicable = [...product.bulkPricingTiers]
         .sort((a, b) => b.minQty - a.minQty)
@@ -42,15 +53,15 @@ export function ProductDetailClient({ product, inventory }: ProductDetailClientP
 
   const handleAddToCart = () => {
     addItem({
-      productId: product._id,
+      productId,
       name: product.name,
-      sku: product.sku,
+      sku: product.sku || '',
       slug: product.slug,
-      imageUrl: product.images?.[selectedImage]?.url || product.images?.[0]?.url,
+      imageUrl: images[selectedImage]?.url || images[0]?.url,
       quantity,
       unitPrice: currentUnitPrice,
       totalPrice: currentTotal,
-      moq: product.moq || 1,
+      moq,
     });
     if ((window as any).__showToast) {
       (window as any).__showToast(`Added ${quantity} units to your cart`, 'success');
@@ -69,10 +80,6 @@ export function ProductDetailClient({ product, inventory }: ProductDetailClientP
       setTimeout(() => setCopied(false), 2000);
     }
   };
-
-  const images = product.images && product.images.length > 0
-    ? product.images
-    : [{ url: '', altText: product.name }];
 
   return (
     <div className="bg-white border border-[#EDE4D6] rounded-2xl shadow-sm overflow-hidden p-6 lg:p-10">

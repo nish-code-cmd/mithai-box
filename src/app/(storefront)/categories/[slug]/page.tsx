@@ -1,8 +1,7 @@
 import React from 'react';
 import { notFound } from 'next/navigation';
 import ProductsPage from '@/app/(storefront)/products/page';
-import { connectDB } from '@/lib/db/connect';
-import { Category } from '@/models';
+import { createClient } from '@/lib/supabase/server';
 
 interface CategoryPageProps {
   params: Promise<{ slug: string }>;
@@ -13,8 +12,14 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
   const { slug } = await params;
   const sParams = await searchParams;
 
-  await connectDB();
-  const category = await Category.findOne({ slug, isActive: true }).lean();
+  const supabase = await createClient();
+  const { data: category } = await supabase
+    .from('categories')
+    .select('id, name, slug')
+    .eq('slug', slug)
+    .eq('is_active', true)
+    .maybeSingle();
+
   if (!category) {
     notFound();
   }

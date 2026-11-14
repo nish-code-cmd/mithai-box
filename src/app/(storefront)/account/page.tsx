@@ -2,9 +2,8 @@ import React from 'react';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { getCustomerSession } from '@/lib/auth/session';
-import { connectDB } from '@/lib/db/connect';
-import { Order, Address } from '@/models';
-import { Package, MapPin, Heart, LogOut, ChevronRight, User as UserIcon } from 'lucide-react';
+import { getAdminClient } from '@/lib/supabase/admin';
+import { Package, MapPin, Heart, LogOut, ChevronRight } from 'lucide-react';
 import { ORDER_STATUS_LABELS, ORDER_STATUS_COLORS } from '@/lib/constants';
 
 export const dynamic = 'force-dynamic';
@@ -15,11 +14,22 @@ export default async function AccountPage() {
     redirect('/auth/login?returnUrl=/account');
   }
 
-  await connectDB();
-  const [orders, addresses] = await Promise.all([
-    Order.find({ user: session.user._id }).sort({ createdAt: -1 }).limit(5).lean(),
-    Address.find({ user: session.user._id }).lean(),
+  const admin = getAdminClient();
+  const [ordersRes, addressesRes] = await Promise.all([
+    admin
+      .from('orders')
+      .select('*, order_items(*)')
+      .eq('user_id', session.user.id || session.user._id)
+      .order('created_at', { ascending: false })
+      .limit(5),
+    admin
+      .from('addresses')
+      .select('id')
+      .eq('user_id', session.user.id || session.user._id),
   ]);
+
+  const orders = ordersRes.data || [];
+  const addressCount = addressesRes.data?.length || 0;
 
   return (
     <div className="bg-[#FAF7F0] min-h-screen py-10">
@@ -76,7 +86,7 @@ export default async function AccountPage() {
               </div>
               <div>
                 <p className="text-sm font-bold text-[#24211F]">Saved Addresses</p>
-                <p className="text-xs text-stone-500">{addresses.length} saved destinations</p>
+                <p className="text-xs text-stone-500">{addressCount} saved destinations</p>
               </div>
             </div>
             <ChevronRight size={16} className="text-stone-400" />
@@ -111,14 +121,14 @@ export default async function AccountPage() {
           {orders.length > 0 ? (
             <div className="divide-y divide-[#EDE4D6]">
               {orders.map((o: any) => (
-                <div key={o._id} className="py-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div key={o.id} className="py-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                   <div>
-                    <span className="font-mono text-xs font-bold text-[#681C2D]">#{o.orderNumber}</span>
+                    <span className="font-mono text-xs font-bold text-[#681C2D]">#{o.order_number}</span>
                     <p className="text-xs text-stone-500 mt-0.5">
-                      Placed on {new Date(o.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      Placed on {new Date(o.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                     </p>
                     <p className="text-xs text-stone-700 font-medium mt-1">
-                      {o.items.length} items • ₹{o.grandTotal.toLocaleString('en-IN')}
+                      {o.order_items?.length || 0} items • ₹{Number(o.total_amount).toLocaleString('en-IN')}
                     </p>
                   </div>
 
@@ -127,7 +137,7 @@ export default async function AccountPage() {
                       {ORDER_STATUS_LABELS[o.status] || o.status}
                     </span>
                     <Link
-                      href={`/account/orders/${o._id}`}
+                      href={`/account/orders/${o.id}`}
                       className="text-xs font-semibold text-[#681C2D] hover:text-[#B8955A] flex items-center gap-1"
                     >
                       Details <ChevronRight size={14} />

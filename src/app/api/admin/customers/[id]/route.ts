@@ -1,38 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { connectDB } from '@/lib/db/connect';
-import { User, Order, Address } from '@/models';
+import { getAdminClient } from '@/lib/supabase/admin';
 import { requireAdminAuth } from '@/lib/auth/session';
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    await requireAdminAuth(['super_admin', 'customer_support', 'order_manager']);
+    await requireAdminAuth();
     const { id } = await params;
-    await connectDB();
+    const admin = getAdminClient();
 
-    const customer = await User.findById(id).lean();
-    if (!customer) {
+    const [profileRes, ordersRes, addressesRes] = await Promise.all([
+      admin.from('profiles').select('*').eq('id', id).maybeSingle(),
+      admin.from('orders').select('*').eq('user_id', id).order('created_at', { ascending: false }).limit(10),
+      admin.from('addresses').select('*').eq('user_id', id),
+    ]);
+
+    if (!profileRes.data) {
       return NextResponse.json({ success: false, error: 'Customer not found' }, { status: 404 });
     }
-
-    const [orders, addresses] = await Promise.all([
-      Order.find({ user: customer._id }).sort({ createdAt: -1 }).limit(10).lean(),
-      Address.find({ user: customer._id }).lean(),
-    ]);
 
     return NextResponse.json({
       success: true,
       data: {
-        customer,
-        orders,
-        addresses,
+        customer: profileRes.data,
+        orders: ordersRes.data || [],
+        addresses: addressesRes.data || [],
       },
     });
   } catch (err: any) {
-    if (err.message === 'UNAUTHORIZED') return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
-    if (err.message === 'FORBIDDEN') return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+    return NextResponse.json({ success: false, error: err.message || 'Unauthorized' }, { status: 401 });
   }
 }

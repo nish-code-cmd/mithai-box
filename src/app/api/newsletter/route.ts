@@ -1,42 +1,37 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { connectDB } from '@/lib/db/connect';
-import { NewsletterSubscription } from '@/models';
-import { NewsletterSignupSchema } from '@/lib/validation/schemas';
+import { getAdminClient } from '@/lib/supabase/admin';
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const parsed = NewsletterSignupSchema.safeParse(body);
-    if (!parsed.success) {
+    const email = body?.email?.toLowerCase().trim();
+
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return NextResponse.json(
-        { success: false, error: 'Please provide a valid email and consent.' },
+        { success: false, error: 'Please provide a valid email address.' },
         { status: 400 }
       );
     }
 
-    if (parsed.data.website) {
+    if (body.website) {
       // Honeypot triggered
       return NextResponse.json({ success: true, message: 'Subscribed' }, { status: 200 });
     }
 
-    await connectDB();
-
-    await NewsletterSubscription.findOneAndUpdate(
-      { email: parsed.data.email },
-      {
-        email: parsed.data.email,
-        isActive: true,
-        source: 'storefront_footer',
-        subscribedAt: new Date(),
-      },
-      { upsert: true, new: true }
-    );
+    const admin = getAdminClient();
+    // Record newsletter in settings or enquiries
+    await admin.from('wholesale_enquiries').insert({
+      name: 'Newsletter Subscriber',
+      email,
+      message: 'Subscribed to storefront newsletter',
+      status: 'new',
+    });
 
     return NextResponse.json({
       success: true,
       message: 'Thank you for subscribing to Mithai Box Wala updates!',
     });
   } catch (err: any) {
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+    return NextResponse.json({ success: false, error: err.message || 'Internal server error' }, { status: 500 });
   }
 }

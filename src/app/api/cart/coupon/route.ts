@@ -1,9 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { connectDB } from '@/lib/db/connect';
-import { Cart } from '@/models';
-import { getCustomerSession } from '@/lib/auth/session';
-import { cookies } from 'next/headers';
-import { calculateCart } from '@/server/services/cart.service';
+import { getAdminClient } from '@/lib/supabase/admin';
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,66 +10,36 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Coupon code is required' }, { status: 400 });
     }
 
-    await connectDB();
-    const session = await getCustomerSession();
-    const cookieStore = await cookies();
-    const guestId = cookieStore.get('mb_guest_id')?.value;
+    const admin = getAdminClient();
+    const { data: coupon, error } = await admin
+      .from('coupons')
+      .select('*')
+      .eq('code', code)
+      .eq('is_active', true)
+      .maybeSingle();
 
-    let query: any = {};
-    if (session) {
-      query.user = session.user._id;
-    } else if (guestId) {
-      query.guestId = guestId;
-    } else {
-      return NextResponse.json({ success: false, error: 'Cart not found' }, { status: 404 });
+    if (error || !coupon) {
+      return NextResponse.json({ success: false, error: 'Invalid or inactive coupon code' }, { status: 400 });
     }
 
-    const cart = await Cart.findOne(query);
-    if (!cart) {
-      return NextResponse.json({ success: false, error: 'Cart not found' }, { status: 404 });
+    if (coupon.valid_until && new Date(coupon.valid_until) < new Date()) {
+      return NextResponse.json({ success: false, error: 'This coupon has expired' }, { status: 400 });
     }
 
-    const calculated = await calculateCart(cart._id.toString(), code);
-    if (calculated.couponError) {
-      return NextResponse.json({ success: false, error: calculated.couponError }, { status: 400 });
-    }
-
-    cart.couponCode = code;
-    await cart.save();
-
-    return NextResponse.json({ success: true, data: calculated });
+    return NextResponse.json({
+      success: true,
+      coupon: {
+        code: coupon.code,
+        discountType: coupon.discount_type,
+        discountValue: coupon.discount_value,
+        minOrderAmount: coupon.min_order_amount,
+      },
+    });
   } catch (err: any) {
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+    return NextResponse.json({ success: false, error: err.message || 'Internal server error' }, { status: 500 });
   }
 }
 
 export async function DELETE() {
-  try {
-    await connectDB();
-    const session = await getCustomerSession();
-    const cookieStore = await cookies();
-    const guestId = cookieStore.get('mb_guest_id')?.value;
-
-    let query: any = {};
-    if (session) {
-      query.user = session.user._id;
-    } else if (guestId) {
-      query.guestId = guestId;
-    } else {
-      return NextResponse.json({ success: false, error: 'Cart not found' }, { status: 404 });
-    }
-
-    const cart = await Cart.findOne(query);
-    if (!cart) {
-      return NextResponse.json({ success: false, error: 'Cart not found' }, { status: 404 });
-    }
-
-    cart.couponCode = undefined;
-    await cart.save();
-
-    const calculated = await calculateCart(cart._id.toString());
-    return NextResponse.json({ success: true, data: calculated });
-  } catch (err: any) {
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
-  }
+  return NextResponse.json({ success: true, message: 'Coupon removed' });
 }

@@ -49,16 +49,18 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           }}>
             <div style={{
               width: 40, height: 40, borderRadius: 12,
-              background: 'linear-gradient(135deg, #681C2D 0%, #4A1420 100%)',
+              overflow: 'hidden',
+              background: '#681C2D',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              border: '1px solid rgba(184,149,90,0.3)',
+              border: '1.5px solid rgba(184,149,90,0.5)',
               flexShrink: 0,
               boxShadow: '0 4px 12px rgba(104,28,45,0.4)',
             }}>
-              <span style={{
-                fontFamily: "'Cormorant Garamond', Georgia, serif",
-                fontSize: 16, fontWeight: 800, color: '#B8955A',
-              }}>MB</span>
+              <img
+                src="/images/editorial/Gemini_Generated_Image_3w4lsp3w4lsp3w4l.png"
+                alt="Mithai Box Wala"
+                style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+              />
             </div>
             <div>
               <div style={{ fontSize: 14, fontWeight: 700, color: '#FAF7F0', letterSpacing: '-.01em' }}>

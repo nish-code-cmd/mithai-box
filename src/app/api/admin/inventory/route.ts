@@ -1,36 +1,49 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { connectDB } from '@/lib/db/connect';
-import { Inventory, Product } from '@/models';
+import { getAdminClient } from '@/lib/supabase/admin';
 import { requireAdminAuth } from '@/lib/auth/session';
 
 export async function GET(request: NextRequest) {
   try {
-    await requireAdminAuth(['super_admin', 'inventory_manager', 'catalog_manager']);
-    await connectDB();
-
+    await requireAdminAuth();
     const { searchParams } = new URL(request.url);
     const lowStockOnly = searchParams.get('lowStock') === 'true';
 
-    let query: any = {};
+    const admin = getAdminClient();
+    let query = admin
+      .from('products')
+      .select('id, name, sku, stock, low_stock_threshold, base_price, images, categories(name)')
+      .eq('is_active', true)
+      .order('stock', { ascending: true });
+
     if (lowStockOnly) {
-      query.$expr = {
-        $lte: [{ $subtract: ['$quantityOnHand', '$quantityReserved'] }, '$lowStockThreshold'],
-      };
+      query = query.filter('stock', 'lte', 'low_stock_threshold');
     }
 
-    const inventories = await Inventory.find(query)
-      .populate({
-        path: 'product',
-        select: 'name sku basePrice images category',
-        populate: { path: 'category', select: 'name' },
-      })
-      .sort({ updatedAt: -1 })
-      .lean();
+    const { data: products, error } = await query;
 
-    return NextResponse.json({ success: true, data: inventories });
+    if (error) {
+      return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    }
+
+    const items = (products || []).map((p: any) => ({
+      _id: p.id,
+      id: p.id,
+      product: {
+        _id: p.id,
+        name: p.name,
+        sku: p.sku,
+        basePrice: p.base_price,
+        images: p.images,
+        category: p.categories,
+      },
+      quantityOnHand: p.stock,
+      quantityReserved: 0,
+      lowStockThreshold: p.low_stock_threshold,
+      updatedAt: new Date().toISOString(),
+    }));
+
+    return NextResponse.json({ success: true, data: items });
   } catch (err: any) {
-    if (err.message === 'UNAUTHORIZED') return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
-    if (err.message === 'FORBIDDEN') return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+    return NextResponse.json({ success: false, error: err.message || 'Unauthorized' }, { status: 401 });
   }
 }

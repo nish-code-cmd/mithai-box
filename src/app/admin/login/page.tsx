@@ -95,16 +95,18 @@ export default function AdminLoginPage() {
             <div
               className="logo-pulse"
               style={{
-                width: 72, height: 72, borderRadius: 20, margin: '0 auto 16px',
-                background: `linear-gradient(135deg, ${C.burgundy} 0%, #4A1420 100%)`,
+                width: 76, height: 76, borderRadius: 22, margin: '0 auto 16px',
+                overflow: 'hidden',
+                background: C.burgundy,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                border: `1px solid rgba(184,149,90,0.35)`,
+                border: `1.5px solid rgba(184,149,90,0.5)`,
               }}
             >
-              <span style={{
-                fontFamily: "'Cormorant Garamond', Georgia, serif",
-                fontSize: 26, fontWeight: 800, color: C.gold, letterSpacing: '-0.02em',
-              }}>MB</span>
+              <img
+                src="/images/editorial/Gemini_Generated_Image_3w4lsp3w4lsp3w4l.png"
+                alt="Mithai Box Wala Logo"
+                style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+              />
             </div>
             <h1 style={{
               fontFamily: "'Cormorant Garamond', Georgia, serif",

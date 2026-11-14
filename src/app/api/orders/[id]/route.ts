@@ -1,39 +1,37 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { connectDB } from '@/lib/db/connect';
-import { Order, Shipment } from '@/models';
-import { requireCustomerAuth } from '@/lib/auth/session';
+import { createClient } from '@/lib/supabase/server';
+import { getAdminClient } from '@/lib/supabase/admin';
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params;
-    const session = await requireCustomerAuth();
-    await connectDB();
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
 
-    const order = await Order.findOne({
-      _id: id,
-      user: session.user._id,
-    }).lean();
+    if (!user) {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    }
 
-    if (!order) {
+    const admin = getAdminClient();
+    const { data: order, error } = await admin
+      .from('orders')
+      .select('*, order_items(*)')
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (error || !order) {
       return NextResponse.json({ success: false, error: 'Order not found' }, { status: 404 });
     }
 
-    const shipment = await Shipment.findOne({ order: order._id }).lean();
-
     return NextResponse.json({
       success: true,
-      data: {
-        ...order,
-        shipment,
-      },
+      data: order,
     });
   } catch (err: any) {
-    if (err.message === 'UNAUTHORIZED') {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
-    }
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+    return NextResponse.json({ success: false, error: err.message || 'Internal server error' }, { status: 500 });
   }
 }

@@ -1,8 +1,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { connectDB } from '@/lib/db/connect';
-import { Product, Inventory } from '@/models';
+import { createClient } from '@/lib/supabase/server';
 import { ProductDetailClient } from './ProductDetailClient';
 import { ProductCard } from '@/components/product/ProductCard';
 import { ChevronRight, ShieldCheck, Truck, Clock, PackageCheck } from 'lucide-react';
@@ -14,42 +13,61 @@ interface ProductPageProps {
 
 export async function generateMetadata({ params }: ProductPageProps) {
   const { slug } = await params;
-  await connectDB();
-  const product = await Product.findOne({ slug, isActive: true }).lean();
+  const supabase = await createClient();
+  const { data: product } = await supabase
+    .from('products')
+    .select('name, description, images')
+    .eq('slug', slug)
+    .eq('is_active', true)
+    .maybeSingle();
+
   if (!product) return {};
 
+  const firstImg = Array.isArray(product.images) && product.images.length > 0 ? product.images[0] : null;
+
   return {
-    title: product.seoTitle || `${product.name} — ${BUSINESS.brand}`,
-    description: product.seoDescription || product.shortDescription || `${product.name} manufactured by Ajay Packers.`,
+    title: `${product.name} — ${BUSINESS.brand}`,
+    description: product.description || `${product.name} manufactured by Ajay Packers.`,
     openGraph: {
       title: product.name,
-      description: product.shortDescription,
-      images: product.images?.[0]?.url ? [{ url: product.images[0].url }] : [],
+      description: product.description || undefined,
+      images: firstImg ? [{ url: firstImg }] : [],
     },
   };
 }
 
 export default async function ProductDetailPage({ params }: ProductPageProps) {
   const { slug } = await params;
-  await connectDB();
+  const supabase = await createClient();
 
-  const product = await Product.findOne({ slug, isActive: true })
-    .populate('category', 'name slug')
-    .lean();
+  const { data: product, error } = await supabase
+    .from('products')
+    .select('*, categories(id, name, slug)')
+    .eq('slug', slug)
+    .eq('is_active', true)
+    .maybeSingle();
 
-  if (!product) {
+  if (error || !product) {
     notFound();
   }
 
-  const inventory = await Inventory.findOne({ product: product._id }).lean();
+  // Fetch related products from same category
+  let relatedProducts: any[] = [];
+  if (product.category_id) {
+    const { data: related } = await supabase
+      .from('products')
+      .select('*, categories(id, name, slug)')
+      .eq('category_id', product.category_id)
+      .neq('id', product.id)
+      .eq('is_active', true)
+      .limit(4);
 
-  const relatedProducts = await Product.find({
-    category: product.category,
-    _id: { $ne: product._id },
-    isActive: true,
-  })
-    .limit(4)
-    .lean();
+    if (related) {
+      relatedProducts = related;
+    }
+  }
+
+  const category = product.categories;
 
   return (
     <div className="bg-[#FAF7F0] min-h-screen py-10">
@@ -59,11 +77,11 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
           <Link href="/" className="hover:text-[#681C2D]">Home</Link>
           <ChevronRight size={12} />
           <Link href="/products" className="hover:text-[#681C2D]">Packaging</Link>
-          {product.category && (
+          {category && (
             <>
               <ChevronRight size={12} />
-              <Link href={`/categories/${(product.category as any).slug}`} className="hover:text-[#681C2D]">
-                {(product.category as any).name}
+              <Link href={`/products?category=${category.slug}`} className="hover:text-[#681C2D]">
+                {category.name}
               </Link>
             </>
           )}
@@ -73,8 +91,8 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
 
         {/* Product Details Section (Client Component) */}
         <ProductDetailClient
-          product={JSON.parse(JSON.stringify(product))}
-          inventory={JSON.parse(JSON.stringify(inventory || {}))}
+          product={product}
+          inventory={{ quantity: product.stock }}
         />
 
         {/* Trust Badges Bar */}
@@ -130,7 +148,7 @@ export default async function ProductDetailPage({ params }: ProductPageProps) {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
               {relatedProducts.map((p: any) => (
-                <ProductCard key={p._id} product={JSON.parse(JSON.stringify(p))} />
+                <ProductCard key={p.id} product={p} />
               ))}
             </div>
           </div>

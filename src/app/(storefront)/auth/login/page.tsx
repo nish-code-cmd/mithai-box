@@ -204,14 +204,19 @@ export default function AuthPage() {
             <div
               className="float-icon"
               style={{
-                width: 68, height: 68, borderRadius: 20,
-                background: 'linear-gradient(135deg, #FAF7F0 0%, #EDE4D6 100%)',
+                width: 72, height: 72, borderRadius: 20,
+                overflow: 'hidden',
+                background: '#681C2D',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 margin: '0 auto 16px', boxShadow: '0 12px 40px rgba(0,0,0,0.25)',
-                border: '1px solid rgba(184,149,90,0.4)',
+                border: '1.5px solid rgba(184,149,90,0.5)',
               }}
             >
-              <Package size={32} color={C.burgundy} />
+              <img
+                src="/images/editorial/Gemini_Generated_Image_3w4lsp3w4lsp3w4l.png"
+                alt="Mithai Box Wala Official Logo"
+                style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+              />
             </div>
             <h1 style={{
               fontFamily: "'Cormorant Garamond', Georgia, serif",

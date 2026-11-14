@@ -1,18 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminAuth } from '@/lib/auth/session';
-import { connectDB } from '@/lib/db/connect';
-import { Product } from '@/models';
+import { getAdminClient } from '@/lib/supabase/admin';
 import path from 'path';
 import fs from 'fs/promises';
 
 type Params = { params: Promise<{ id: string }> };
 
-const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
-const MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
+const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/avif'];
+const MAX_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
 
 export async function POST(req: NextRequest, { params }: Params) {
   try {
-    await requireAdminAuth(['super_admin', 'catalog_manager']);
+    await requireAdminAuth(['admin', 'superadmin']);
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Unauthorized';
     return NextResponse.json({ error: msg }, { status: msg === 'FORBIDDEN' ? 403 : 401 });
@@ -21,10 +20,16 @@ export async function POST(req: NextRequest, { params }: Params) {
   const { id } = await params;
 
   try {
-    await connectDB();
+    const admin = getAdminClient();
 
-    const product = await Product.findById(id);
-    if (!product) {
+    // Check product exists
+    const { data: product, error: fetchErr } = await admin
+      .from('products')
+      .select('id, images')
+      .eq('id', id)
+      .single();
+
+    if (fetchErr || !product) {
       return NextResponse.json({ error: 'Product not found' }, { status: 404 });
     }
 
@@ -36,44 +41,65 @@ export async function POST(req: NextRequest, { params }: Params) {
     }
 
     if (!ALLOWED_TYPES.includes(file.type)) {
-      return NextResponse.json({ error: 'Invalid file type. Allowed: jpeg, png, webp' }, { status: 400 });
+      return NextResponse.json({ error: 'Invalid file type. Allowed: jpeg, png, webp, avif' }, { status: 400 });
     }
 
     if (file.size > MAX_SIZE_BYTES) {
-      return NextResponse.json({ error: 'File too large. Max 5MB' }, { status: 400 });
+      return NextResponse.json({ error: 'File too large. Max 10MB' }, { status: 400 });
     }
 
-    const altText = formData.get('altText') as string | null;
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
-
-    const ext = file.type.split('/')[1];
+    const ext = file.type.split('/')[1] || 'jpg';
     const filename = `${id}-${Date.now()}.${ext}`;
+    const storagePath = `products/${id}/${filename}`;
 
-    if (process.env.NODE_ENV === 'production') {
-      // TODO: upload to cloud storage (e.g. AWS S3 / Cloudflare R2)
-      // For now fall through to local storage
-      return NextResponse.json({ error: 'Storage service not configured for production' }, { status: 501 });
+    let imageUrl: string = '';
+
+    // 1. Try Supabase Storage upload
+    const { data: uploadData, error: uploadErr } = await admin.storage
+      .from('product-images')
+      .upload(storagePath, buffer, {
+        contentType: file.type,
+        upsert: true,
+      });
+
+    if (!uploadErr && uploadData) {
+      const { data: publicUrlData } = admin.storage
+        .from('product-images')
+        .getPublicUrl(storagePath);
+      imageUrl = publicUrlData.publicUrl;
+    } else {
+      // 2. Fallback to local storage if bucket is not yet created in Supabase Dashboard
+      const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'products');
+      await fs.mkdir(uploadDir, { recursive: true });
+      await fs.writeFile(path.join(uploadDir, filename), buffer);
+      imageUrl = `/uploads/products/${filename}`;
     }
 
-    // Dev: save to public/uploads/products/
-    const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'products');
-    await fs.mkdir(uploadDir, { recursive: true });
-    await fs.writeFile(path.join(uploadDir, filename), buffer);
+    // Append to product images array in Supabase
+    const currentImages = Array.isArray(product.images) ? product.images : [];
+    const updatedImages = [...currentImages, imageUrl];
 
-    const imageUrl = `/uploads/products/${filename}`;
-    const storageKey = `products/${filename}`;
+    const { error: updateErr } = await admin
+      .from('products')
+      .update({ images: updatedImages, updated_at: new Date().toISOString() })
+      .eq('id', id);
 
-    product.images.push({
-      url: imageUrl,
-      altText: altText ?? '',
-      sortOrder: product.images.length,
-      storageKey,
-    });
+    if (updateErr) {
+      return NextResponse.json({ error: 'Failed to update product images' }, { status: 500 });
+    }
 
-    await product.save();
-
-    return NextResponse.json({ success: true, image: { url: imageUrl, storageKey, altText } }, { status: 201 });
+    return NextResponse.json(
+      {
+        success: true,
+        image: {
+          url: imageUrl,
+          filename,
+        },
+      },
+      { status: 201 }
+    );
   } catch (err) {
     console.error('[Admin Product Images POST] Error:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
@@ -82,7 +108,7 @@ export async function POST(req: NextRequest, { params }: Params) {
 
 export async function DELETE(req: NextRequest, { params }: Params) {
   try {
-    await requireAdminAuth(['super_admin', 'catalog_manager']);
+    await requireAdminAuth(['admin', 'superadmin']);
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Unauthorized';
     return NextResponse.json({ error: msg }, { status: msg === 'FORBIDDEN' ? 403 : 401 });
@@ -90,42 +116,32 @@ export async function DELETE(req: NextRequest, { params }: Params) {
 
   const { id } = await params;
 
-  let body: { storageKey?: string };
   try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
-  }
+    const body = await req.json();
+    const { imageUrl } = body;
 
-  if (!body.storageKey) {
-    return NextResponse.json({ error: 'storageKey is required' }, { status: 400 });
-  }
+    if (!imageUrl) {
+      return NextResponse.json({ error: 'imageUrl is required' }, { status: 400 });
+    }
 
-  try {
-    await connectDB();
+    const admin = getAdminClient();
+    const { data: product } = await admin
+      .from('products')
+      .select('images')
+      .eq('id', id)
+      .single();
 
-    const product = await Product.findById(id);
     if (!product) {
       return NextResponse.json({ error: 'Product not found' }, { status: 404 });
     }
 
-    const imgIndex = product.images.findIndex((img) => img.storageKey === body.storageKey);
-    if (imgIndex === -1) {
-      return NextResponse.json({ error: 'Image not found' }, { status: 404 });
-    }
+    const currentImages = Array.isArray(product.images) ? product.images : [];
+    const filteredImages = currentImages.filter((img: string) => img !== imageUrl);
 
-    // Delete file from local storage in dev
-    if (process.env.NODE_ENV !== 'production') {
-      try {
-        const filePath = path.join(process.cwd(), 'public', body.storageKey);
-        await fs.unlink(filePath);
-      } catch {
-        // Ignore if file doesn't exist on disk
-      }
-    }
-
-    product.images.splice(imgIndex, 1);
-    await product.save();
+    await admin
+      .from('products')
+      .update({ images: filteredImages, updated_at: new Date().toISOString() })
+      .eq('id', id);
 
     return NextResponse.json({ success: true });
   } catch (err) {
