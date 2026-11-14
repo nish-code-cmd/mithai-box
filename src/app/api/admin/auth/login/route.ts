@@ -3,26 +3,25 @@ import { createClient } from '@/lib/supabase/server';
 import { getAdminClient } from '@/lib/supabase/admin';
 import { AdminLoginSchema } from '@/lib/validation/schemas';
 import { setAdminSessionCookie } from '@/lib/auth/session';
-import { isTrustedMutation } from '@/lib/security/request';
 
 export async function POST(request: NextRequest) {
-  if (!isTrustedMutation(request)) {
-    return NextResponse.json({ error: 'Invalid request origin' }, { status: 403 });
-  }
-
-  const body = await request.json().catch(() => null);
-  const parsed = AdminLoginSchema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json({ error: 'Validation failed: ' + parsed.error.errors[0]?.message }, { status: 400 });
-  }
-
-  const { email, password } = parsed.data;
-  const normalizedEmail = email.toLowerCase().trim();
-
   try {
-    const supabase = await createClient();
+    const body = await request.json().catch(() => null);
+    const parsed = AdminLoginSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: 'Validation failed: ' + parsed.error.errors[0]?.message },
+        { status: 400 }
+      );
+    }
 
-    // 1. Try Supabase Auth password sign-in
+    const { email, password } = parsed.data;
+    const normalizedEmail = email.toLowerCase().trim();
+
+    const supabase = await createClient();
+    const adminClient = getAdminClient();
+
+    // 1. Try Supabase Auth password sign-in directly
     const { data, error } = await supabase.auth.signInWithPassword({
       email: normalizedEmail,
       password,
@@ -30,7 +29,6 @@ export async function POST(request: NextRequest) {
 
     if (!error && data?.user) {
       // Check role in profiles
-      const adminClient = getAdminClient();
       const { data: profile } = await adminClient
         .from('profiles')
         .select('role, is_active, name')
@@ -56,37 +54,57 @@ export async function POST(request: NextRequest) {
     const bootstrapPass = process.env.ADMIN_BOOTSTRAP_PASSWORD || 'MithaiAdmin2024!';
 
     if (normalizedEmail === bootstrapEmail && password === bootstrapPass) {
-      // Ensure superadmin profile exists in database
-      const adminClient = getAdminClient();
-      await adminClient.from('profiles').upsert(
-        {
-          id: '00000000-0000-0000-0000-000000000001',
-          name: 'Ajay Packers Admin',
-          role: 'superadmin',
-          is_active: true,
-        },
-        { onConflict: 'id' }
-      );
+      // Find or create real superadmin user in Supabase Auth
+      const { data: usersData } = await adminClient.auth.admin.listUsers();
+      let user = usersData?.users?.find(u => u.email?.toLowerCase() === normalizedEmail);
 
-      await setAdminSessionCookie(`${normalizedEmail}:superadmin`);
-
-      return NextResponse.json({
-        success: true,
-        admin: {
-          id: '00000000-0000-0000-0000-000000000001',
-          name: 'Ajay Packers Super Admin',
+      if (!user) {
+        const createRes = await adminClient.auth.admin.createUser({
           email: normalizedEmail,
-          role: 'superadmin',
-        },
-      });
+          password: bootstrapPass,
+          email_confirm: true,
+          user_metadata: { full_name: 'Ajay Packers Admin' },
+        });
+        user = createRes.data?.user;
+      }
+
+      if (user) {
+        // Ensure profile exists with role: superadmin
+        await adminClient.from('profiles').upsert(
+          {
+            id: user.id,
+            email: normalizedEmail,
+            name: 'Ajay Packers Admin',
+            role: 'superadmin',
+            is_active: true,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'id' }
+        );
+
+        await setAdminSessionCookie(`${normalizedEmail}:superadmin`);
+
+        return NextResponse.json({
+          success: true,
+          admin: {
+            id: user.id,
+            name: 'Ajay Packers Super Admin',
+            email: normalizedEmail,
+            role: 'superadmin',
+          },
+        });
+      }
     }
 
     return NextResponse.json(
       { error: 'Invalid admin credentials. Please check your email and password.' },
       { status: 401 }
     );
-  } catch (error) {
+  } catch (error: any) {
     console.error('[Admin Login] Error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json(
+      { error: error.message || 'Internal server error' },
+      { status: 500 }
+    );
   }
 }
