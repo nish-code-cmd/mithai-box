@@ -10,6 +10,7 @@
     "syntaxcheck": "node --max-old-space-size=2048 ./node_modules/typescript/bin/tsc --project tsconfig.syntax.json",
     "audit": "pnpm audit --audit-level=high",
     "test": "vitest run",
+    "db:setup": "npx tsx scripts/setup-supabase.ts",
     "seed": "npx tsx scripts/seed.ts",
     "bootstrap:admin": "npx tsx scripts/bootstrap-admin.ts"
   },
@@ -49,12 +50,14 @@
     "@types/bcryptjs": "^3.0.0",
     "@types/node": "^20",
     "@types/nodemailer": "^8.0.2",
+    "@types/pg": "^8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@vitest/coverage-v8": "^5.0.5",
     "eslint": "^9",
     "eslint-config-next": "16.4.3",
     "msw": "^3.0.3",
+    "pg": "^8.23.1",
     "tailwindcss": "^4",
     "typescript": "^6",
     "vitest": "^5.0.5"
