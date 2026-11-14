@@ -5,6 +5,7 @@ import {
   LayoutDashboard, Package, ShoppingCart, Warehouse,
   Users, Tag, MessageSquare, Settings, LogOut,
   ShieldAlert, Image, BarChart3, ChevronRight,
+  FolderTree, ShoppingBag,
 } from 'lucide-react';
 import { BUSINESS } from '@/lib/constants';
 
@@ -13,7 +14,9 @@ export const dynamic = 'force-dynamic';
 const NAV = [
   { label: 'Overview',       href: '/admin',              icon: LayoutDashboard },
   { label: 'Products',       href: '/admin/products',     icon: Package },
+  { label: 'Categories',     href: '/admin/categories',   icon: FolderTree },
   { label: 'Orders',         href: '/admin/orders',       icon: ShoppingCart },
+  { label: 'Active Carts',   href: '/admin/carts',        icon: ShoppingBag },
   { label: 'Inventory',      href: '/admin/inventory',    icon: Warehouse },
   { label: 'Customers',      href: '/admin/customers',    icon: Users },
   { label: 'Coupons',        href: '/admin/coupons',      icon: Tag },

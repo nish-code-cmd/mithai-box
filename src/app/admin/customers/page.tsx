@@ -1,7 +1,9 @@
 import React from 'react';
 import { redirect } from 'next/navigation';
+import Link from 'next/link';
 import { getAdminClient } from '@/lib/supabase/admin';
 import { getAdminSession } from '@/lib/auth/session';
+import { ArrowRight } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -38,12 +40,17 @@ export default async function AdminCustomersPage() {
                 <th className="p-4">Role</th>
                 <th className="p-4">Registered Date</th>
                 <th className="p-4">Status</th>
+                <th className="p-4 text-right">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#EDE4D6]">
               {customers.map((c: any) => (
                 <tr key={c.id} className="hover:bg-[#FAF7F0] transition-colors">
-                  <td className="p-4 font-bold text-stone-900">{c.name || 'Packaging Customer'}</td>
+                  <td className="p-4 font-bold text-stone-900">
+                    <Link href={`/admin/customers/${c.id}`} className="hover:text-[#681C2D]">
+                      {c.name || 'Packaging Customer'}
+                    </Link>
+                  </td>
                   <td className="p-4 text-stone-600">{c.phone || '—'}</td>
                   <td className="p-4 text-stone-600 font-medium">{c.company || '—'}</td>
                   <td className="p-4 uppercase text-[10px] font-bold text-[#681C2D]">
@@ -57,11 +64,16 @@ export default async function AdminCustomersPage() {
                       {c.is_active ? 'Active' : 'Inactive'}
                     </span>
                   </td>
+                  <td className="p-4 text-right">
+                    <Link href={`/admin/customers/${c.id}`} className="text-[#681C2D] font-semibold hover:underline inline-flex items-center gap-1 text-[11px]">
+                      View <ArrowRight size={12} />
+                    </Link>
+                  </td>
                 </tr>
               ))}
               {customers.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="p-8 text-center text-stone-400">
+                  <td colSpan={7} className="p-8 text-center text-stone-400">
                     No customers registered yet.
                   </td>
                 </tr>

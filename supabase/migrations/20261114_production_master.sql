@@ -199,6 +199,23 @@ CREATE TABLE IF NOT EXISTS public.settings (
 );
 
 -- ============================================================
+-- 10B. INVENTORY AUDIT LOGS
+-- ============================================================
+CREATE TABLE IF NOT EXISTS public.inventory_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    product_id UUID REFERENCES public.products(id) ON DELETE CASCADE,
+    previous_stock INTEGER NOT NULL,
+    new_stock INTEGER NOT NULL,
+    change_qty INTEGER NOT NULL,
+    reason TEXT NOT NULL,
+    created_by TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE public.inventory_logs ENABLE ROW LEVEL SECURITY;
+
+
+-- ============================================================
 -- 11. UPDATED_AT TRIGGER FUNCTION
 -- ============================================================
 CREATE OR REPLACE FUNCTION public.update_updated_at()
@@ -485,6 +502,24 @@ CREATE INDEX IF NOT EXISTS idx_order_items_order ON public.order_items(order_id)
 CREATE INDEX IF NOT EXISTS idx_addresses_user ON public.addresses(user_id);
 CREATE INDEX IF NOT EXISTS idx_cart_user ON public.cart_items(user_id);
 CREATE INDEX IF NOT EXISTS idx_profiles_role ON public.profiles(role);
+CREATE INDEX IF NOT EXISTS idx_inventory_logs_product ON public.inventory_logs(product_id);
+CREATE INDEX IF NOT EXISTS idx_inventory_logs_created ON public.inventory_logs(created_at DESC);
+
+-- ============================================================
+-- 26B. INVENTORY LOG POLICIES
+-- ============================================================
+DROP POLICY IF EXISTS "Admin view inventory logs" ON public.inventory_logs;
+CREATE POLICY "Admin view inventory logs"
+ON public.inventory_logs FOR SELECT
+TO authenticated
+USING (public.is_admin());
+
+DROP POLICY IF EXISTS "Admin insert inventory logs" ON public.inventory_logs;
+CREATE POLICY "Admin insert inventory logs"
+ON public.inventory_logs FOR INSERT
+TO authenticated
+WITH CHECK (public.is_admin());
+
 
 -- ============================================================
 -- 27. DEFAULT PRODUCT CATEGORIES

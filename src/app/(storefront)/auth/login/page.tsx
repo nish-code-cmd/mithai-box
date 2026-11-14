@@ -8,6 +8,8 @@ import {
   ShieldCheck, CheckCircle2, AlertCircle, Package,
   RefreshCw, Lock, Eye, EyeOff, Sparkles,
 } from 'lucide-react';
+import { createBrowserClient } from '@supabase/ssr';
+import { BUSINESS } from '@/lib/constants';
 
 /* ─── Keyframe injection ─────────────────────────────────────────────── */
 const CSS = `
@@ -79,10 +81,13 @@ export default function AuthPage() {
 
   const [mode, setMode]   = useState<'login' | 'signup'>(initMode);
   const [step, setStep]   = useState<'form' | 'otp' | 'success'>('form');
+  const [authMode, setAuthMode] = useState<'otp' | 'password'>('otp');
   const [email, setEmail] = useState('');
   const [name, setName]   = useState('');
   const [phone, setPhone] = useState('');
   const [company, setCompany] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPw, setShowPw] = useState(false);
   const [showEmail, setShowEmail] = useState(false);
   const [digits, setDigits] = useState(['', '', '', '', '', '']);
   const refs = useRef<(HTMLInputElement | null)[]>([]);
@@ -101,7 +106,35 @@ export default function AuthPage() {
   const switchMode = (m: 'login' | 'signup') => {
     setMode(m); setStep('form'); setError(''); setMsg('');
     setEmail(''); setName(''); setPhone(''); setCompany('');
+    setPassword('');
     setDigits(['', '', '', '', '', '']);
+  };
+
+  const signInWithPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true); setError('');
+    try {
+      const supabase = createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!
+      );
+      const { error: signInErr } = await supabase.auth.signInWithPassword({
+        email: email.trim().toLowerCase(),
+        password,
+      });
+      if (signInErr) {
+        if (signInErr.message.includes('Invalid login credentials')) {
+          throw new Error('Invalid email or password. Please check your credentials.');
+        }
+        if (signInErr.message.includes('Email not confirmed')) {
+          throw new Error('Please verify your email address before signing in.');
+        }
+        throw signInErr;
+      }
+      setStep('success');
+      setTimeout(() => router.push(returnUrl), 1500);
+    } catch (err: any) { setError(err.message); }
+    finally { setLoading(false); }
   };
 
   const sendOtp = async (e?: React.FormEvent) => {
@@ -564,6 +597,17 @@ export default function AuthPage() {
                       cursor: 'pointer', fontSize: 12,
                     }}>Create a free account</button>
                   </p>
+                )}
+                {mode === 'login' && (
+                  <div style={{ marginTop: 12, textAlign: 'center' }}>
+                    <Link href="/forgot-password" style={{ fontSize: 12, color: C.muted, textDecoration: 'none' }}>
+                      Forgot password?
+                    </Link>
+                    {' · '}
+                    <Link href="/auth/signup" style={{ fontSize: 12, color: C.burgundy, fontWeight: 600, textDecoration: 'none' }}>
+                      Create account with password
+                    </Link>
+                  </div>
                 )}
               </form>
             )}

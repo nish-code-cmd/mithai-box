@@ -41,6 +41,19 @@ export async function PUT(
       return NextResponse.json({ success: false, error: error.message }, { status: 400 });
     }
 
+    // Record audit log
+    const changeQty = newStock - product.stock;
+    if (changeQty !== 0) {
+      await admin.from('inventory_logs').insert({
+        product_id: id,
+        previous_stock: product.stock,
+        new_stock: newStock,
+        change_qty: changeQty,
+        reason: body.reason || (changeQty > 0 ? 'Manual stock addition' : 'Manual stock reduction'),
+        created_by: 'admin',
+      });
+    }
+
     return NextResponse.json({ success: true, data: updated });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message || 'Unauthorized' }, { status: 401 });
